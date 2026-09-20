@@ -1,0 +1,10 @@
+node_modules/
+.env.local
+.jev-lint-cache/
+corpus/snapshots/
+corpus/judgements.json
+corpus/label-sample.json
+corpus/label-items/
+corpus/axe-report.json
+corpus/label-sample-blind.json
+corpus/labels/

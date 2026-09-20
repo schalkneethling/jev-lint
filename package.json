@@ -1,0 +1,38 @@
+{
+  "name": "jev-lint",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Spike: semantic linting for HTML/CSS/JS with TypeSafe's Jev",
+  "type": "module",
+  "bin": {
+    "jev-lint": "src/cli.ts"
+  },
+  "scripts": {
+    "lint": "varlock run -- node src/cli.ts",
+    "lint:fixtures": "varlock run -- node src/cli.ts fixtures/html",
+    "eval": "varlock run -- node scripts/eval.ts",
+    "smoke": "varlock run -- node scripts/smoke.ts",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "typecheck": "tsc"
+  },
+  "license": "MIT",
+  "packageManager": "pnpm@10.33.2",
+  "engines": {
+    "node": ">=24"
+  },
+  "dependencies": {
+    "@typesafe-ai/sdk": "^0.6.0",
+    "@varlock/1password-plugin": "^2.0.4",
+    "parse5": "^8.0.1",
+    "playwright": "^1.63.0",
+    "tree-sitter-javascript": "^0.25.0",
+    "tree-sitter-typescript": "^0.23.2",
+    "varlock": "^1.20.0",
+    "web-tree-sitter": "^0.27.0"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@types/node": "^26.6.2",
+    "typescript": "^7.0.2"
+  }
+}

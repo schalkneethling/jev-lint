@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Deploying safely</title>
+  </head>
+  <body>
+    <h1>Deploying safely</h1>
+
+    <h2>Rolling back a failed migration</h2>
+    <blockquote>
+      <p>
+        &ldquo;The worst outage I have been part of was not caused by the change itself. It was caused by four people
+        typing into the same terminal at two in the morning, each of them certain that the others had already checked
+        the thing they were about to skip.&rdquo;
+      </p>
+      <footer>Priya Raman, staff engineer, speaking at a post-incident review in March</footer>
+    </blockquote>
+    <p>
+      Before we get into any of the mechanics, it is worth saying why this part of the handbook exists at all. Teams
+      rarely write these pages while things are calm. They write them after an evening that went badly, when the memory
+      of what nobody could find is still sharp, and the page that results is usually a list of the things somebody
+      wished had been written down. This one is no different, and you should read it in that spirit rather than as a
+      procedure handed down from anywhere in particular.
+    </p>
+    <p>
+      The build cache is keyed on the lockfile hash and the Node major version, so a dependency bump invalidates it and
+      a source-only change does not. Restoring it takes about eleven seconds on our runners against four minutes for a
+      cold install, which is most of the difference between a pull request that gets reviewed the same afternoon and
+      one that does not.
+    </p>
+    <p>
+      Keep the cache scoped per branch with a fallback to the default branch's key. A single shared key looks tempting
+      on the graph, but it means a branch that installs an odd dependency poisons everyone else's restore for the rest
+      of the day. If the restore step starts taking longer than the install it replaced, check the artifact size first:
+      caches above a gigabyte spend more time being unpacked than they save.
+    </p>
+  </body>
+</html>

@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en"><head><title>Right descriptions</title></head>
+<body><form>
+  <label for="dob">Date of birth</label><input id="dob" aria-describedby="dob-help" />
+  <p id="dob-help">For example 27 3 1990.</p>
+  <label for="pw">Password</label><input id="pw" type="password" aria-describedby="pw-help" />
+  <p id="pw-help">At least 12 characters, including one number.</p>
+  <label for="email">Email address</label><input id="email" type="email" aria-describedby="email-help email-error" />
+  <p id="email-help">We'll only use this to send your receipt.</p><p id="email-error">Enter an email address in the format name@example.com.</p>
+  <label for="phone">Mobile phone</label><input id="phone" type="tel" aria-describedby="phone-help" />
+  <p id="phone-help">Include your country code, for example +44.</p>
+</form></body></html>

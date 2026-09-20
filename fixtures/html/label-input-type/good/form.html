@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head><title>Well typed inputs</title></head>
+  <body>
+    <form>
+      <label for="name">Full name</label>
+      <input id="name" name="name" type="text" />
+      <label for="email">Email address</label>
+      <input id="email" name="email" type="email" />
+      <label for="phone">Mobile phone</label>
+      <input id="phone" name="phone" type="tel" />
+      <label for="zip">Postal code</label>
+      <input id="zip" name="zip" type="text" inputmode="numeric" />
+      <label for="qty">Quantity</label>
+      <input id="qty" name="quantity" type="number" min="1" />
+      <label for="pw">Password</label>
+      <input id="pw" name="password" type="password" />
+      <label for="dob">Date of birth</label>
+      <input id="dob" name="dob" type="date" />
+      <input name="q" type="search" aria-label="Search products" />
+      <label for="otp">Verification code</label>
+      <input id="otp" name="otp" type="text" inputmode="numeric" autocomplete="one-time-code" />
+      <label for="cc-exp">Expiration (MM/YY)</label>
+      <input id="cc-exp" name="cc-exp" type="text" placeholder="MM/YY" />
+    </form>
+  </body>
+</html>

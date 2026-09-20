@@ -1,0 +1,209 @@
+<title>jev-lint Label Bench</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root {
+  --ground: #F6F8F5; --surface: #FFFFFF; --ink: #18201D; --muted: #5A6760; --line: #D8DED7;
+  --jev: #0F6B5C; --code-ground: #EDF1EC;
+  --yes: #1F6F3D; --yes-ground: #E3F1E7; --no: #B3261E; --no-ground: #F9E6E4; --unsure: #8F5400; --unsure-ground: #F7ECD9;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #111514; --surface: #181D1B; --ink: #E4EBE7; --muted: #93A19A; --line: #2A3330;
+    --jev: #55C7B2; --code-ground: #1F2623;
+    --yes: #6FCF8F; --yes-ground: #15281C; --no: #F2776C; --no-ground: #2E1917; --unsure: #E2AA4E; --unsure-ground: #2B2214;
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #111514; --surface: #181D1B; --ink: #E4EBE7; --muted: #93A19A; --line: #2A3330;
+  --jev: #55C7B2; --code-ground: #1F2623;
+  --yes: #6FCF8F; --yes-ground: #15281C; --no: #F2776C; --no-ground: #2E1917; --unsure: #E2AA4E; --unsure-ground: #2B2214;
+}
+* { box-sizing: border-box; }
+body { background: var(--ground); color: var(--ink); font: 400 15px/1.55 var(--sans); padding-inline: clamp(16px, 4vw, 48px); padding-block: 28px 64px; }
+.wrap { max-inline-size: 52rem; margin-inline: auto; display: grid; gap: 24px; }
+h1 { font-size: 1.5rem; line-height: 1.2; font-weight: 600; margin: 0; }
+h2 { font-size: 1.15rem; line-height: 1.35; font-weight: 600; margin: 0; text-wrap: balance; }
+p { margin: 0; }
+.eyebrow { font: 500 0.75rem/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--jev); }
+.lede, .quiet { color: var(--muted); }
+.lede { max-inline-size: 65ch; }
+header { display: grid; gap: 8px; }
+
+.progress { display: grid; gap: 6px; }
+.track { block-size: 8px; background: var(--code-ground); display: flex; }
+.track i { display: block; block-size: 100%; }
+.track .yes { background: var(--yes); } .track .no { background: var(--no); } .track .unsure { background: var(--unsure); }
+.counts { font: 400 0.8rem/1.4 var(--mono); color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 16px; font-variant-numeric: tabular-nums; }
+
+.item { background: var(--surface); border: 1px solid var(--line); padding: clamp(16px, 3vw, 28px); display: grid; gap: 18px; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; font: 400 0.8rem/1.4 var(--mono); color: var(--muted); }
+.meta b { color: var(--ink); font-weight: 500; }
+.rule-says { color: var(--muted); max-inline-size: 65ch; }
+.claim { border-inline-start: 3px solid var(--jev); padding-inline-start: 14px; display: grid; gap: 6px; }
+.hint { color: var(--jev); }
+pre { margin: 0; font: 400 0.8rem/1.5 var(--mono); background: var(--code-ground); padding: 10px 12px; white-space: pre-wrap; overflow-wrap: anywhere; max-block-size: 14rem; overflow-y: auto; }
+dl { margin: 0; display: grid; gap: 4px; font: 400 0.82rem/1.5 var(--mono); }
+dl div { display: grid; grid-template-columns: minmax(0, 15rem) 1fr; gap: 12px; }
+dt { color: var(--muted); overflow-wrap: anywhere; } dd { margin: 0; overflow-wrap: anywhere; }
+.label { font: 500 0.72rem/1 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+section.block { display: grid; gap: 8px; }
+a { color: var(--jev); overflow-wrap: anywhere; }
+
+.answer { display: grid; gap: 12px; }
+.buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+button { font: 500 0.95rem/1 var(--sans); padding: 12px 16px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; display: inline-flex; gap: 10px; align-items: center; }
+button kbd { font: 400 0.72rem/1 var(--mono); color: var(--muted); border: 1px solid var(--line); padding: 3px 5px; }
+button:hover:not(:disabled) { border-color: var(--ink); }
+button:disabled { opacity: 0.5; cursor: default; }
+button[data-label="yes"][aria-pressed="true"] { background: var(--yes-ground); border-color: var(--yes); color: var(--yes); }
+button[data-label="no"][aria-pressed="true"] { background: var(--no-ground); border-color: var(--no); color: var(--no); }
+button[data-label="unsure"][aria-pressed="true"] { background: var(--unsure-ground); border-color: var(--unsure); color: var(--unsure); }
+:focus-visible { outline: 2px solid var(--jev); outline-offset: 2px; }
+textarea { font: inherit; color: var(--ink); background: var(--ground); border: 1px solid var(--line); padding: 8px 10px; inline-size: 100%; min-block-size: 3.2rem; resize: vertical; }
+.nav { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: center; }
+.nav .quiet { font: 400 0.8rem/1.4 var(--mono); }
+.status { font: 400 0.85rem/1.4 var(--mono); color: var(--muted); min-block-size: 1.4em; }
+.notice { background: var(--surface); border: 1px solid var(--line); padding: 20px; color: var(--muted); }
+@media (max-width: 34rem) { dl div { grid-template-columns: 1fr; gap: 0; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">jev-lint label bench</p>
+    <h1>Is each finding true?</h1>
+    <p class="lede">Each item is a claim a rule could make about one element from a real page. Judge the claim on its merits. Whether the tool actually reported it, and how confident it was, is hidden on purpose: some items were reported and some were not.</p>
+  </header>
+
+  <div class="progress" aria-live="polite">
+    <div class="track" id="track" role="img" aria-label="Labelling progress"></div>
+    <div class="counts" id="counts">Loading…</div>
+  </div>
+
+  <div id="stage"><div class="notice" id="notice">Loading the sample…</div></div>
+</div>
+
+<script>
+(() => {
+  const stage = document.getElementById("stage");
+  const LABELS = { yes: "The claim is true", no: "The claim is false", unsure: "Cannot tell" };
+  let db = null;
+  let items = [];
+  let labels = new Map();
+  let index = 0;
+  let saving = false;
+
+  const el = (tag, props = {}, children = []) => {
+    const node = Object.assign(document.createElement(tag), props);
+    for (const child of [].concat(children)) node.append(child);
+    return node;
+  };
+  const notice = (text) => stage.replaceChildren(el("div", { className: "notice", textContent: text }));
+
+  function definition(object) {
+    const entries = Object.entries(object ?? {}).filter(([, value]) => value !== null && value !== "");
+    return el("dl", {}, entries.map(([key, value]) => el("div", {}, [el("dt", { textContent: key.replaceAll("_", " ") }), el("dd", { textContent: String(value) })])));
+  }
+
+  function renderProgress() {
+    const tally = { yes: 0, no: 0, unsure: 0 };
+    for (const item of items) { const given = labels.get(item.id)?.label; if (given) tally[given]++; }
+    const done = tally.yes + tally.no + tally.unsure;
+    document.getElementById("track").replaceChildren(...Object.entries(tally).map(([name, count]) => {
+      const bar = el("i", { className: name }); bar.style.inlineSize = items.length ? `${(count / items.length) * 100}%` : "0"; return bar;
+    }));
+    document.getElementById("counts").replaceChildren(
+      el("span", { textContent: `${done} of ${items.length} labelled` }),
+      el("span", { textContent: `${tally.yes} true` }), el("span", { textContent: `${tally.no} false` }), el("span", { textContent: `${tally.unsure} cannot tell` }),
+    );
+  }
+
+  function render() {
+    renderProgress();
+    if (items.length === 0) return notice("No items have been added to this bench yet.");
+    const item = items[index];
+    const given = labels.get(item.id) ?? {};
+    const note = el("textarea", { id: "note", value: given.note ?? "", placeholder: "Optional: why, or what would make it true" });
+    const status = el("p", { className: "status", id: "status", textContent: given.label ? `Saved: ${LABELS[given.label].toLowerCase()}.` : "" });
+
+    const buttons = Object.entries(LABELS).map(([name, text], i) => {
+      const button = el("button", { type: "button", id: `label-${name}` }, [text, el("kbd", { textContent: String(i + 1) })]);
+      button.dataset.label = name;
+      button.setAttribute("aria-pressed", String(given.label === name));
+      button.addEventListener("click", () => save(name));
+      return button;
+    });
+
+    const previous = el("button", { type: "button", id: "previous", textContent: "← Previous", disabled: index === 0 });
+    const next = el("button", { type: "button", id: "next", textContent: "Next →", disabled: index === items.length - 1 });
+    const skip = el("button", { type: "button", id: "next-unlabelled", textContent: "Next unlabelled" });
+    previous.addEventListener("click", () => go(index - 1));
+    next.addEventListener("click", () => go(index + 1));
+    skip.addEventListener("click", nextUnlabelled);
+
+    stage.replaceChildren(el("article", { className: "item" }, [
+      el("div", { className: "meta" }, [el("span", {}, [el("b", { textContent: `${index + 1}` }), ` of ${items.length}`]), el("span", { textContent: item.rule }), el("span", { textContent: `${item.kind} page · ${item.band}` })]),
+      el("p", { className: "rule-says", textContent: `What this rule is about: ${item.ruleDescription}` }),
+      el("div", { className: "claim" }, [el("p", { className: "label", textContent: "The claim" }), el("h2", { textContent: item.claim }), item.hint ? el("p", { className: "hint", textContent: item.hint }) : ""]),
+      el("section", { className: "block" }, [el("p", { className: "label", textContent: "The element" }), el("pre", { textContent: item.snippet || "(no source quoted)" })]),
+      el("section", { className: "block" }, [el("p", { className: "label", textContent: "The words the model was shown" }), definition(item.checked)]),
+      Object.keys(item.facts ?? {}).length ? el("section", { className: "block" }, [el("p", { className: "label", textContent: "What code established" }), definition(item.facts)]) : "",
+      el("p", {}, [el("span", { className: "label", textContent: "Page " }), el("a", { href: item.page, target: "_blank", rel: "noopener noreferrer", textContent: item.page })]),
+      el("div", { className: "answer" }, [el("div", { className: "buttons" }, buttons), note, status]),
+      el("div", { className: "nav" }, [previous, skip, next]),
+    ]));
+  }
+
+  function go(to) { if (to >= 0 && to < items.length) { index = to; render(); window.scrollTo({ top: 0 }); } }
+  function nextUnlabelled() {
+    const order = [...items.keys()].map((i) => (i + index + 1) % items.length);
+    const to = order.find((i) => !labels.get(items[i].id)?.label);
+    if (to === undefined) document.getElementById("status").textContent = "Everything is labelled. Thank you.";
+    else go(to);
+  }
+
+  async function save(label) {
+    if (saving || !db) return;
+    saving = true;
+    const item = items[index];
+    const status = document.getElementById("status");
+    status.textContent = "Saving…";
+    try {
+      // One document per item, written whole: the latest answer replaces an earlier one.
+      await db.doc(`labels/${item.id}`).set({ label, note: document.getElementById("note").value.trim(), at: new Date().toISOString() });
+      labels.set(item.id, { label, note: document.getElementById("note").value.trim() });
+      saving = false;
+      nextUnlabelled();
+    } catch (error) {
+      saving = false;
+      status.textContent = error?.code === "invalid_argument" ? "This view cannot save labels. Ask the owner for edit or interact access." : "Could not save. Check your connection and select the answer again.";
+    }
+  }
+
+  document.addEventListener("keydown", (event) => {
+    if (event.target instanceof HTMLTextAreaElement || event.metaKey || event.ctrlKey || event.altKey) return;
+    const name = Object.keys(LABELS)[Number(event.key) - 1];
+    if (name) save(name);
+    if (event.key === "ArrowLeft") go(index - 1);
+    if (event.key === "ArrowRight") go(index + 1);
+  });
+
+  async function start() {
+    db = await window.claude?.use?.("db");
+    if (!db) return notice("This view cannot reach the label store, so labels cannot be loaded or saved here. Open the page in claude.ai while signed in.");
+    try {
+      // The sample is one document, loaded by the tool that drew it; labels are one small document each.
+      const [sample, labelDocs] = await Promise.all([db.doc("bench/sample").get(), db.collection("labels").limit(1000).get()]);
+      items = sample.exists ? (sample.data().items ?? []) : [];
+      labels = new Map(labelDocs.docs.map((doc) => [doc.id, doc.data()]));
+      const firstOpen = items.findIndex((item) => !labels.get(item.id)?.label);
+      index = firstOpen === -1 ? 0 : firstOpen;
+      render();
+    } catch {
+      notice("The sample could not be loaded. Reload the page to try again.");
+    }
+  }
+  start();
+})();
+</script>

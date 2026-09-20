@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Contributing</title>
+  </head>
+  <body>
+    <h1>Contributing</h1>
+
+    <!--
+      The opening matches the heading and then the section wanders into company history. A reader who
+      skipped here on the strength of the heading gets what they came for, so this is not a mismatch;
+      the later drift is a structure problem for a different rule.
+    -->
+    <h2>Setting up your development environment</h2>
+    <p>
+      You need Node 24 or newer and pnpm 10. Install pnpm through corepack rather than globally, so that the version
+      pinned in the repository is the one that runs. Clone the repository, run <code>pnpm install</code>, and then run
+      <code>pnpm test</code> once before changing anything: a clean checkout that fails its own tests means your
+      toolchain is wrong, and finding that out now is much cheaper than finding it out after an afternoon of work.
+    </p>
+    <p>
+      There is no build step. The editor integration reads the same tsconfig the command line does, so if your editor
+      disagrees with <code>pnpm typecheck</code> it is almost always because the editor picked up a globally installed
+      TypeScript instead of the one in the repository.
+    </p>
+    <p>
+      This project started as a weekend experiment by two people who had been complaining about the same problem for a
+      year and finally decided to find out whether it was as hard as they thought. It was open-sourced eight months
+      later, mostly because a third person asked for it in a conference hallway and nobody could think of a reason to
+      say no. The governance model was written afterwards, in an afternoon, and has not needed changing since.
+    </p>
+    <p>
+      We are hiring two engineers this quarter, one for the runtime and one for developer experience. Both roles are
+      remote within European time zones and both are open to people who have never worked on a compiler before; the
+      reading list on the careers page is what we would expect someone to work through in their first month, not what
+      we expect them to know on the first day.
+    </p>
+  </body>
+</html>

@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="en"><head><title>Missing and wrong autocomplete</title></head>
+<body><form>
+  <label for="a">Email address</label><input id="a" type="email" name="email" />
+  <label for="b">First name</label><input id="b" name="fname" />
+  <label for="c">Mobile phone</label><input id="c" type="tel" name="phone" />
+  <label for="d">Postcode</label><input id="d" name="zip" autocomplete="tel" />
+  <label for="e">Last name</label><input id="e" name="lname" autocomplete="given-name" />
+  <label for="f">Card number</label><input id="f" name="cc" autocomplete="username" />
+  <label for="g">Street address</label><input id="g" name="address" autocomplete="shipping email" />
+</form></body></html>

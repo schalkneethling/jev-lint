@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Tuning the service</title>
+  </head>
+  <body>
+    <h1>Tuning the service</h1>
+
+    <h2>Choosing a thread pool size</h2>
+    <p>
+      A few years ago I sat in the back row of a conference talk whose title I have forgotten, given by someone whose
+      name I never wrote down, and the only thing I remember from it is a slide with a single sentence on it: measure
+      the thing you are about to guess at. I have quoted that slide in more design reviews than I can count, usually to
+      people who were about to spend an afternoon arguing about a number that a ten minute experiment would have
+      settled. It is the least original advice in this entire handbook and it is still the advice that gets ignored
+      most often, so here it is again at the top of a page where it applies.
+    </p>
+    <p>
+      Every log line the service emits is a single JSON object on one line, with no pretty printing and no multi-line
+      stack traces. The collector splits on newlines, so a stack trace written across twelve lines becomes twelve
+      unrelated events, eleven of which carry no request id and are therefore unsearchable.
+    </p>
+    <p>
+      Five fields are required on every line: <code>timestamp</code> in RFC 3339 with milliseconds,
+      <code>level</code>, <code>message</code>, <code>request_id</code>, and <code>service</code>. Anything else goes
+      under a <code>context</code> object so that a new field can be added without colliding with a field name the
+      collector already reserves. Do not put a customer's email address, a payment token, or an authorisation header
+      anywhere in that object; the redaction pass runs on known key names and will not catch one it has not been told
+      about.
+    </p>
+  </body>
+</html>
