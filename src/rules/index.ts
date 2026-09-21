@@ -9,11 +9,9 @@ import altTextQuality from "./html/alt-text-quality.ts";
 import ariaHiddenHidesContent from "./html/aria-hidden-hides-content.ts";
 import ariaLabelJustified from "./html/aria-label-justified.ts";
 import autocompleteMatchesLabel from "./html/autocomplete-matches-label.ts";
-import classImpliesElement from "./html/class-implies-element.ts";
 import controlTypeIntent from "./html/control-type-intent.ts";
 import describedbyDescribes from "./html/describedby-describes.ts";
 import descriptionMatchesPage from "./html/description-matches-page.ts";
-import headingDescribesSection from "./html/heading-describes-section.ts";
 import labelInputType from "./html/label-input-type.ts";
 import linkTextPurpose from "./html/link-text-purpose.ts";
 
@@ -23,11 +21,9 @@ export const htmlRules: AnyRule[] = [
   ariaHiddenHidesContent,
   ariaLabelJustified,
   autocompleteMatchesLabel,
-  classImpliesElement,
   controlTypeIntent,
   describedbyDescribes,
   descriptionMatchesPage,
-  headingDescribesSection,
   labelInputType,
   linkTextPurpose,
 ];

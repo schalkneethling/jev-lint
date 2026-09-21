@@ -3,11 +3,11 @@ import { test } from "node:test";
 import { parseCode } from "../src/code/parse.ts";
 import { parseHtml } from "../src/html/parse.ts";
 import functionNameMatchesBody from "../src/rules/code/function-name-matches-body.ts";
-import headingDescribesSection from "../src/rules/html/heading-describes-section.ts";
+import ariaHiddenHidesContent from "../src/rules/html/aria-hidden-hides-content.ts";
 import { limits, withLimit } from "../src/rules/limits.ts";
 
 const longFunction = (chars: number) => `function collectTotals(rows) {\n  let total = 0;\n  // ${"x".repeat(chars)}\n  return total;\n}\n`;
-const longSection = (count: number) => `<h2>Totals</h2><p>${Array.from({ length: count }, (_, i) => `word${i}`).join(" ")}</p>`;
+const longHidden = (count: number) => `<p aria-hidden="true">${Array.from({ length: count }, (_, i) => `word${i}`).join(" ")}</p>`;
 const field = (candidates: { data: { [key: string]: unknown } }[], name: string) => String(candidates[0]!.data[name]);
 
 test("the rules read their limits at select time, so a limit can be varied without forking a rule", async () => {
@@ -26,15 +26,15 @@ test("the rules read their limits at select time, so a limit can be varied witho
 });
 
 test("withLimit restores the limit when the body throws, and Infinity means no truncation", async () => {
-  const before = limits.headingSectionWords;
-  const html = parseHtml("t.html", longSection(before * 2));
+  const before = limits.hiddenTextWords;
+  const html = parseHtml("t.html", longHidden(before * 2));
 
-  assert.match(field(headingDescribesSection.select(html), "content_under_heading"), / …$/);
+  assert.match(field(ariaHiddenHidesContent.select(html), "hidden_text"), / …$/);
 
-  const whole = await withLimit("headingSectionWords", Infinity, async () => headingDescribesSection.select(html));
-  assert.doesNotMatch(field(whole, "content_under_heading"), / …$/);
-  assert.equal(field(whole, "content_under_heading").split(" ").length, before * 2);
+  const whole = await withLimit("hiddenTextWords", Infinity, async () => ariaHiddenHidesContent.select(html));
+  assert.doesNotMatch(field(whole, "hidden_text"), / …$/);
+  assert.equal(field(whole, "hidden_text").split(" ").length, before * 2);
 
-  await assert.rejects(withLimit("headingSectionWords", 5, async () => Promise.reject(new Error("boom"))), /boom/);
-  assert.equal(limits.headingSectionWords, before);
+  await assert.rejects(withLimit("hiddenTextWords", 5, async () => Promise.reject(new Error("boom"))), /boom/);
+  assert.equal(limits.hiddenTextWords, before);
 });

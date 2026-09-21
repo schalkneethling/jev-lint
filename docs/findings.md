@@ -858,6 +858,14 @@ right: it is close to silent, and partly a matter of taste. `class-implies-eleme
 `aria-hidden-hides-content` (3/7) are unchanged in kind: their false reports are judgement, not facts.
 A third sample of 55 unseen items, for the eight rules that changed, is the test of these numbers.
 
+**Two rules removed.** Taken over both rounds, `heading-describes-section` was right on 5 of 14 labelled
+reports and `class-implies-element` on 8 of 15, and in neither did the probability separate right from
+wrong (headings: false at 0.91, true at 0.72; classes: false at 0.99, true at 0.45). A threshold cannot
+rescue a rule whose scores do not rank. The heading rule asks a question people disagree on; the class
+rule asks about names when the answer lies in contents. A rule that cannot be made right is noise, and
+noise costs the trust the other rules earn, so both are gone: ten HTML rules remain. The rule catalog
+records what a successor to the class rule would need.
+
 ## 21. Working rules for writing a Jev lint
 
 −1. Ask for the defect, not the virtue. "Is this specific enough?" has no boundary and a literal reader
@@ -891,6 +899,8 @@ A third sample of 55 unseen items, for the eight rules that changed, is the test
     watch both recall and what gets diluted. More context can lose a finding as easily as find one.
 17. Pin the model version. Thresholds are tuned against it.
 18. Eight right out of eight is not a perfect rule. Score every fix on a sample it has not seen.
+19. Check that a rule's probabilities rank its reports before tuning its threshold. If right and wrong
+    are interleaved at every score, remove the rule.
 
 ## Open questions
 

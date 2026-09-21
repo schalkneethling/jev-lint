@@ -16,7 +16,7 @@
 //   varlock run -- node scripts/truncation-experiment.ts --limit <name> --rule <id> <dir>...
 //       Real input: how many candidates exceed each value, and how many change reported status.
 //
-//   varlock run -- node scripts/truncation-experiment.ts --limit headingSectionWords --labels
+//   varlock run -- node scripts/truncation-experiment.ts --limit hiddenTextWords --labels
 //       The blind-labelled corpus judgements for the rule, re-judged at each value.
 import { existsSync, globSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { parseArgs } from "node:util";
@@ -87,7 +87,6 @@ async function facts(): Promise<void> {
 
   // Select with the limits off, so what is measured is the untruncated text each rule would send.
   const field: Record<string, { rule: string; key: string; limit: number }> = {
-    headingSectionWords: { rule: "heading-describes-section", key: "content_under_heading", limit: limits.headingSectionWords },
     hiddenTextWords: { rule: "aria-hidden-hides-content", key: "hidden_text", limit: limits.hiddenTextWords },
     alertMessageWords: { rule: "alert-is-urgent", key: "message", limit: limits.alertMessageWords },
     fieldDescriptionWords: { rule: "describedby-describes", key: "description_announced_after_label", limit: limits.fieldDescriptionWords },
@@ -141,8 +140,6 @@ function variantsOf(limit: LimitName): { name: string; value: number }[] {
 
 const ruleFor = (limit: LimitName): AnyRule => {
   const byLimit: Partial<Record<LimitName, string>> = {
-    headingSectionWords: "heading-describes-section",
-    headingListItems: "heading-describes-section",
     hiddenTextWords: "aria-hidden-hides-content",
     alertMessageWords: "alert-is-urgent",
     fieldDescriptionWords: "describedby-describes",
@@ -211,9 +208,8 @@ async function onRealInput(limit: LimitName, rule: AnyRule): Promise<void> {
     .filter((path) => (rule.target === "code") === /\.(ts|js|tsx|jsx|mjs|cjs)$/.test(path));
   const files: SourceFile[] = paths.map((path) => ({ path, source: readFileSync(path, "utf8") }));
 
-  // How many candidates the limit actually reaches, measured once with the limit off. `headingListItems`
-  // counts list members rather than the text it sends, so it has no size to compare a value against.
-  const untruncated = limit === "headingListItems" ? undefined : await withLimit(limit, NO_LIMIT, async () =>
+  // How many candidates the limit actually reaches, measured once with the limit off.
+  const untruncated = await withLimit(limit, NO_LIMIT, async () =>
     (await Promise.all(files.map(async (file) => rule.select(rule.target === "code" ? await parseCode(file.path, file.source) : (parseHtml(file.path, file.source) as never)))))
       .flat()
       .map((candidate) => Math.max(...Object.values(candidate.data).map((value) => (typeof value === "string" ? (limit === "codeChars" ? value.length : words(value)) : 0)))),

@@ -52,6 +52,4 @@ export const FORM_CHECKS: Record<string, string[]> = {
   "control-type-intent": ["link-name"],
   "aria-label-justified": ["link-name", "button-name", "aria-valid-attr", "aria-allowed-attr", "label-content-name-mismatch"],
   "label-input-type": ["label", "autocomplete-valid"],
-  "heading-describes-section": ["empty-heading", "heading-order", "page-has-heading-one"],
-  "class-implies-element": ["region", "landmark-one-main", "bypass"],
 };

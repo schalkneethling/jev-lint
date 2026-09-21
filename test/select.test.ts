@@ -2,8 +2,6 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { parseHtml } from "../src/html/parse.ts";
 import altTextQuality from "../src/rules/html/alt-text-quality.ts";
-import classImpliesElement from "../src/rules/html/class-implies-element.ts";
-import headingDescribesSection from "../src/rules/html/heading-describes-section.ts";
 import labelInputType from "../src/rules/html/label-input-type.ts";
 
 const select = (rule: typeof altTextQuality, html: string) => rule.select(parseHtml("t.html", html));
@@ -26,28 +24,6 @@ test("label-input-type resolves for=, wrapping labels and aria-label, and hides 
   );
   assert.deepEqual(candidates.map((c) => [c.data.label, c.meta!.type]), [["Email", "text"], ["Website", "text"], ["Search", "email"]]);
   assert.ok(candidates.every((c) => !("type" in c.data)));
-});
-
-test("class-implies-element skips role, unnamed elements and repeated signatures, and records relatives", () => {
-  const candidates = select(
-    classImpliesElement,
-    `<footer><div class="footer-content"></div></footer>
-     <div class="nav" role="navigation"></div><div></div>
-     <div class="card"></div><div class="card"></div>`,
-  );
-  assert.deepEqual(candidates.map((c) => c.data.class), ["footer-content", "card"]);
-  assert.ok(candidates[0]!.meta!.relatives!.split(" ").includes("footer"));
-});
-
-test("heading-describes-section stops at the next heading of the same level and skips thin sections", () => {
-  const words = (n: number, w: string) => Array.from({ length: n }, () => w).join(" ");
-  const candidates = select(
-    headingDescribesSection,
-    `<h2>One</h2><p>${words(15, "alpha")}</p><h3>Sub</h3><p>${words(15, "beta")}</p><h2>Two</h2><p>too short</p>`,
-  );
-  assert.deepEqual(candidates.map((c) => c.data.heading), ["One", "Sub"]);
-  assert.match(String(candidates[0]!.data.content_under_heading), /alpha.*Sub.*beta/);
-  assert.doesNotMatch(String(candidates[1]!.data.content_under_heading), /Two/);
 });
 
 test("aria-label-justified sorts labels by how they relate to the visible text, and asks one question per case", async () => {
@@ -162,16 +138,6 @@ test("aria-label-justified ignores a link whose only visible text is an image's 
     parseHtml("t.html", `<a href="/a" aria-label="Eight ideas"><img src="a.jpg" alt="A building"></a><a href="/b" aria-label="Close">Open</a>`),
   );
   assert.deepEqual(candidates.map((c) => c.data.visible_text), ["Open"]);
-});
-
-test("heading-describes-section skips a heading over a form, but one search box does not make a form", () => {
-  const prose = "We answer within two working days and never share what you send us with anybody else at all.";
-  const candidates = select(
-    headingDescribesSection,
-    `<h2>Book a meeting</h2><form><p>${prose}</p><input name="email"><select><option>Afghanistan</option></select></form>
-     <h2>About us</h2><p>${prose}</p><input type="search" name="q">`,
-  );
-  assert.deepEqual(candidates.map((c) => c.data.heading), ["About us"]);
 });
 
 test("describedby-describes decides in code that a description repeating the label is a defect", async () => {

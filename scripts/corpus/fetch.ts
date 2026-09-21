@@ -235,7 +235,7 @@ async function feedLinks(page: Page): Promise<string[]> {
 
 /**
  * Whether the page loaded really is an article: the same test `description-matches-page` applies, plus
- * enough prose for that rule and `heading-describes-section` to have something to judge. A section index
+ * enough prose for that rule to have something to judge. A section index
  * satisfies neither, and a teaser link often leads to one.
  */
 async function isArticlePage(page: Page): Promise<boolean> {

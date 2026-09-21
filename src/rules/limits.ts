@@ -16,21 +16,6 @@ export const limits = {
    */
   codeChars: 6000,
   /**
-   * Words of the content under a heading (`heading-describes-section`). 7% of the corpus's 1,287 headings
-   * carry more than 80 words. Where a section opens with a quote, a byline, or "in this section we will
-   * look at", the topic only appears after word 80: recall on those was 0/3 at 80 words, 1/3 at 160 and 3/3
-   * at 240, with no false positive on matched sections at any value. Unbounded is worse than 240, not better:
-   * it dropped a real mismatch from 0.86 to 0.71. On 654 real corpus headings, 240 reports nothing new and
-   * two fewer borderline reviews, against one flip in the control run.
-   */
-  headingSectionWords: 240,
-  /**
-   * List items named when the content under a heading is a list (`heading-describes-section`). 25% of corpus
-   * headings are summarised as a list and half of those lists hold more than five items, but naming 20 of
-   * them, or all of them, moved two of 572 candidates where the control moved two: no measured effect.
-   */
-  headingListItems: 5,
-  /**
    * Words of the text inside an `aria-hidden` element (`aria-hidden-hides-content`). It bites often, on 17%
    * of 412 corpus candidates, and changes nothing: mean p moved from 0.445 to 0.453 between 40 words and no
    * limit, and the status changes (14 in the control, 27 to 38 at wider values) are this rule's candidates

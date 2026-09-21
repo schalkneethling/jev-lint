@@ -23,14 +23,28 @@ Risk refers to [Jev 1.13 jaggedness](https://docs.typesafe.ai/model-jaggedness/j
 | `link-text-purpose` | "click here", "more", bare timestamps; raw URLs decided in code | accessible name and the heading above the link; `href` withheld | two Nouls: is the text only filler; is it an item of the kind the heading announces | p = filler × (1 − item under heading) | built |
 | `control-type-intent` | links that go nowhere and perform actions (`<a href="#">Delete</a>`) | only links with a placeholder `href`; a real destination means navigation, decided in code | Choice: navigates / performs action / unclear | p = P(performs action) | built |
 | `label-input-type` | "Email" with `type="text"`, "Postal code" with `type="number"` | label, placeholder, name; `type` withheld | Choice over value kinds | p = 1 − P(option matching the actual `type`); suggests the right type | built |
-| `class-implies-element` | `<div class="site-header">`, `<span class="btn">` | class and id; semantic ancestors and descendants withheld | Choice over semantic elements, or none | p = 1 − P(none); suppressed when that element already wraps or sits inside it | built |
-| `heading-describes-section` | template leftovers, headings that no longer match their content | heading, first 80 words under it | Noul: is the content about the heading's topic | p = 1 − noul; lenient thresholds | built |
+| `class-implies-element` | `<div class="site-header">`, `<span class="btn">` | class and id; semantic ancestors and descendants withheld | Choice over semantic elements, or none | p = 1 − P(none); suppressed when that element already wraps or sits inside it | removed: see below |
+| `heading-describes-section` | template leftovers, headings that no longer match their content | heading, first 80 words under it | Noul: is the content about the heading's topic | p = 1 − noul; lenient thresholds | removed: see below |
 | `autocomplete-matches-label` | "Email" without `autocomplete="email"`, or with the wrong token (WCAG 1.3.5) | label, placeholder, name (shares its request with `label-input-type`); the token withheld | Choice over 17 personal-data purposes, or none | compare with the actual token; the hint names the right one | built |
 | `description-matches-page` | a meta description copied from another page or left over from a template | description, title, h1, first 60 words of the main paragraphs | Noul: is the description about a different subject | high p reports | built |
 | `button-text-is-action` | buttons labelled "OK", "Yes", "Here" | button text | Noul: does the text name the action | low p reports | idea |
 | `placeholder-as-label` | placeholder carries the only instruction for a field | placeholder, label presence (code) | Noul: is this placeholder an instruction or label rather than an example value | only when code finds no label | idea |
 | `lang-mismatch` | `lang="en"` on German content | text sample; `lang` withheld | Choice over a closed language list | compare with `lang` | idea; risk: English is the primary training language |
 | `error-text-actionable` | inline validation text that blames or says nothing | text of `[role=alert]`, `.error`, `aria-describedby` targets | Noul | low p reports | idea; same judgement was probed for JS strings |
+
+### Removed after two rounds of blind labels
+
+`heading-describes-section` was right on 5 of 14 labelled reports and its probability did not separate
+right from wrong: false at 0.91 and 0.85, true at 0.72, real defects unreported at 0.70. Whether "Raise
+the bar" fits the copy under it is taste, and a linter should not report taste. The defects it did find
+(consent text under a heading, "Footer Column 2", a phone number as a heading) are extraction facts that
+belong to other checks.
+
+`class-implies-element` was right on 8 of 15, again with no separation (false at 0.99, true at 0.45). It
+judged names alone, but whether a `<div>` should be a `<nav>` depends on what it contains and what it does
+on the page. A successor would describe the element's contents (links only? one control? repeated on
+every page?) and ask what that is, with the name as one field among several. It was also the costliest
+rule: about 19,000 candidates per corpus.
 
 ## ARIA
 

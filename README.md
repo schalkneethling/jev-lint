@@ -11,7 +11,7 @@ fixtures/html/link-text-purpose/bad/generic.html
   6:62     error  Link text "click here" does not describe where the link goes.  link-text-purpose p=0.98
 ```
 
-HTML (twelve rules) and JavaScript/TypeScript (five rules) are implemented. CSS is probed and catalogued.
+HTML (ten rules) and JavaScript/TypeScript (five rules) are implemented. CSS is probed and catalogued.
 
 - [docs/findings.md](docs/findings.md): what worked, what did not, cost, and the rules of thumb that came out of it.
 - [docs/rule-catalog.md](docs/rule-catalog.md): rule ideas with their status.
