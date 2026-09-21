@@ -1,5 +1,5 @@
 import { choice } from "@typesafe-ai/sdk";
-import { defineRule } from "../../engine/types.ts";
+import { defineRule, type Candidate } from "../../engine/types.ts";
 import { attr, byId, fieldLabel, locOf, text, truncateWords } from "../../html/parse.ts";
 import { limits } from "../limits.ts";
 
@@ -19,6 +19,12 @@ const KINDS = {
 
 type Kind = keyof typeof KINDS;
 
+const words = (value: string) => value.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+
+// "Last *" described by "Last". A long label that happens to contain a short hint is not a repeat.
+const repeats = (label: string, description: string) =>
+  words(label).includes(words(description)) && words(label).split(" ").length <= words(description).split(" ").length + 2;
+
 export default defineRule({
   id: "describedby-describes",
   description: "Text linked to a field with aria-describedby should be about that field.",
@@ -32,10 +38,19 @@ export default defineRule({
         return { el, label: fieldLabel(doc, el), description: targets.map((target) => text(target)).join(" ").trim() };
       })
       .filter(({ label, description }) => label !== undefined && description !== "")
-      .map(({ el, label, description }) => ({
+      .map(({ el, label, description }): Candidate => ({
         loc: locOf(el),
         data: { field_label: label!, description_announced_after_label: truncateWords(description, limits.fieldDescriptionWords) },
         meta: { describedby: attr(el, "aria-describedby")! },
+        // Both are announced, one after the other. Whether one repeats the other is a string comparison.
+        // Blind labels: all three defects the rule missed were this, and none was "about another field".
+        ...(repeats(label!, description) && {
+          decided: {
+            p: 0.7,
+            message: `Field "${label}" is described by text that only repeats its label, so a screen reader says it twice: "${truncateWords(description, 12)}"`,
+            hint: `Remove aria-describedby="${attr(el, "aria-describedby")}" or point it at real help text.`,
+          },
+        }),
       })),
 
   // Asked together ("is this description about this field?"), a phone-number hint on a password field

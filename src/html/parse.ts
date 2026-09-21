@@ -61,16 +61,21 @@ export function nearestHeading(doc: HtmlDoc, el: Element): string | undefined {
 // <noscript> is parsed as raw text, so its markup would be quoted as if it were content.
 const SKIP_TEXT = new Set(["script", "style", "template", "noscript"]);
 
-function rawText(node: Node): string {
+function rawText(node: Node, withAlt: boolean): string {
   if (node.nodeName === "#text") return (node as T.TextNode).value;
   if (!isElement(node) || SKIP_TEXT.has(node.tagName)) return "";
   // An image's alt text is what it contributes to its parent's accessible name.
-  if (node.tagName === "img") return ` ${attr(node, "alt") ?? ""} `;
-  return node.childNodes.map(rawText).join(" ");
+  if (node.tagName === "img") return withAlt ? ` ${attr(node, "alt") ?? ""} ` : "";
+  return node.childNodes.map((child) => rawText(child, withAlt)).join(" ");
 }
 
 export function text(node: Node): string {
-  return rawText(node).replace(/\s+/g, " ").trim();
+  return rawText(node, true).replace(/\s+/g, " ").trim();
+}
+
+/** Only the words a sighted user reads as text: an image's alt is part of the name, but nobody sees it. */
+export function writtenText(node: Node): string {
+  return rawText(node, false).replace(/\s+/g, " ").trim();
 }
 
 export function closest(el: Element, tagNames: string[]): Element | undefined {

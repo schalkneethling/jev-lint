@@ -25,8 +25,9 @@ export default defineRule({
     is_urgent: noul(
       `${ref("message")} is announced to screen reader users immediately, interrupting whatever they are doing. Is it urgent enough to justify interrupting them?`,
       {
-        true: "It reports an error, a failure, a security or time-critical warning, or data loss.",
-        false: "It is a success confirmation, a routine status update, marketing, a greeting, or a cookie notice, which should be announced politely or not at all.",
+        true: "It reports a failure of something the user just did, a security or time-critical warning, or data loss.",
+        false:
+          'It is a success confirmation, a routine status update, marketing, a greeting, or a cookie notice, which should be announced politely or not at all. So is a validation note attached to a single form field, such as "This field is required": it belongs to the field, not in an interruption.',
       },
     ),
   }),

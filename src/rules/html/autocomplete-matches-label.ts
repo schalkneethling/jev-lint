@@ -11,6 +11,8 @@ const OPTIONS = {
   email: "The user's email address.",
   tel: "The user's telephone number.",
   "street-address": "The user's street address.",
+  "address-level2": "The user's city or town.",
+  "address-level1": "The user's state, province, or region.",
   "postal-code": "The user's postal or ZIP code.",
   country: "The user's country.",
   organization: "The user's company or organisation.",
@@ -25,6 +27,7 @@ const OPTIONS = {
   none: "Anything that is not a piece of the user's own personal data: a search, a message, a quantity, a coupon code, someone else's details, or a value the user makes up.",
 } as const;
 
+const SEARCH = /search|\bquery\b/i;
 const TEXT_TYPES = ["text", "email", "tel", "url", "password", "number", "date"];
 const normalize = (token: string) => (token.endsWith("-password") ? "password" : token);
 
@@ -35,6 +38,10 @@ export default defineRule({
   select: (doc) =>
     doc.elements
       .filter((el) => el.tagName === "input" && TEXT_TYPES.includes(attr(el, "type") ?? "text"))
+      // A field nobody can type into is filled by the page, not by the user or the browser.
+      .filter((el) => attr(el, "disabled") === undefined && attr(el, "readonly") === undefined)
+      // A search box never asks for the user's own data. Blind labels: two were reported as missing a token.
+      .filter((el) => !SEARCH.test(`${attr(el, "id") ?? ""} ${attr(el, "name") ?? ""} ${attr(el, "placeholder") ?? ""} ${attr(el, "role") ?? ""}`))
       .map((el) => ({ el, label: fieldLabel(doc, el) }))
       .filter(({ label }) => label !== undefined)
       .map(({ el, label }) => {
@@ -62,10 +69,13 @@ export default defineRule({
     const actual = normalize(candidate.meta!.autocomplete!);
     const label = candidate.data.label;
     if (actual === "") {
+      // The token to suggest is the likeliest purpose, which is never "none" for a field being reported.
+      const { none: _none, ...purposes } = purpose.probabilities;
+      const [[suggested]] = Object.entries(purposes).sort(([, a], [, b]) => b - a) as [[string, number]];
       return {
         p: 1 - purpose.probabilities.none,
         message: `Field "${label}" asks for the user's own data but has no autocomplete token, so browsers and assistive tools cannot fill or identify it.`,
-        hint: `autocomplete="${purpose.choice}" matches what the label asks for.`,
+        hint: `autocomplete="${suggested}" matches what the label asks for.`,
       };
     }
     return {

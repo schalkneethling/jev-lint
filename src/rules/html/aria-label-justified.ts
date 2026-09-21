@@ -1,6 +1,6 @@
 import { noul } from "@typesafe-ai/sdk";
 import { defineRule, type Candidate } from "../../engine/types.ts";
-import { attr, locOf, nearestHeading, text, type Element } from "../../html/parse.ts";
+import { attr, locOf, nearestHeading, text, writtenText, type Element } from "../../html/parse.ts";
 
 const isControl = (el: Element) =>
   (el.tagName === "a" && attr(el, "href") !== undefined) ||
@@ -36,7 +36,9 @@ export default defineRule({
     return controls
       // "×", "→" or "☰" is an icon made of text. A label that replaces it is the right thing to do, and
       // WCAG 2.5.3 is about text a person could say aloud, so only visible text with a letter or digit counts.
-      .filter(({ el, visible }) => /[\p{L}\p{N}]/u.test(visible) && (attr(el, "aria-label") ?? "").trim() !== "")
+      // An image's alt is not text anyone sees. Blind labels: a card that is one linked image, labelled
+      // with the article's title on purpose, was reported as "says something else" than its alt.
+      .filter(({ el }) => /[\p{L}\p{N}]/u.test(writtenText(el)) && (attr(el, "aria-label") ?? "").trim() !== "")
       .map(({ el, visible }) => ({ el, visible, label: attr(el, "aria-label")!.trim() }))
       // A card whose link text is a title plus a paragraph, labelled with the title alone: on the first
       // corpus run this was 739 "errors", most of them one cloud provider's product cards, labelled with the product name. The label's

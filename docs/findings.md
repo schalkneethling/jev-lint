@@ -837,6 +837,27 @@ rewritten question was for. Rules that were perfect on the first sample (`link-t
 The remaining false reports are judgement: marketing copy under a form's heading, part-of names from CSS
 modules (`Header_subtitle__x`), a meta description that fits its page.
 
+**Fixes, and what they score.** Code only, except two criteria: `tel:` and `mailto:` links showing their
+own number or address are left alone; a control whose only visible text is an image's alt is not a
+candidate for `aria-label-justified`; `aria-hidden` on an `<svg>` is skipped; a heading over two or more
+form fields is skipped, as is one with no letters; search boxes and fields nobody can type into are not
+asked for an autocomplete token, which gained `address-level1` and `address-level2` (its hint had
+offered `street-address` for a city, and `none` when "none" won); a numeric `inputmode` on a text field
+excuses "number"; a description that repeats its label is decided in code. The two criteria: a
+validation note on one field is not urgent, and a call-to-action heading fits content that leads to the
+action.
+
+Two first attempts were wrong and the labels caught both: dropping `<select>` options from all text
+hid the hidden option lists `aria-hidden-hides-content` had rightly reported, and "any field under the
+heading" silenced a phone number used as a heading over a search box.
+
+Against the same labels, which flatters: 59 of 75 reports right (79%, from 66%). `alert-is-urgent` 10/11
+with recall 10/10 (from 6/7 and 6/10), `label-input-type` 6/6, `link-text-purpose` 5/6,
+`describedby-describes` 2/2. `heading-describes-section` now reports 2 of its 13 labelled items, one
+right: it is close to silent, and partly a matter of taste. `class-implies-element` (3/7) and
+`aria-hidden-hides-content` (3/7) are unchanged in kind: their false reports are judgement, not facts.
+A third sample of 55 unseen items, for the eight rules that changed, is the test of these numbers.
+
 ## 21. Working rules for writing a Jev lint
 
 −1. Ask for the defect, not the virtue. "Is this specific enough?" has no boundary and a literal reader

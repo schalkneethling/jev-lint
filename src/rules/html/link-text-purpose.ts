@@ -49,7 +49,9 @@ export default defineRule({
       .filter((el) => el.tagName === "a" && attr(el, "href") !== undefined)
       .map((el) => ({ el, name: attr(el, "aria-label") ?? text(el), href: attr(el, "href")! }))
       // A link with no accessible name at all is a job for a deterministic linter.
-      .filter(({ name }) => name !== "");
+      .filter(({ name }) => name !== "")
+      // On a tel: or mailto: link the number or address is the destination, and showing it is the point.
+      .filter(({ name, href }) => !(/^(tel|sms):/i.test(href) && /\d{3}/.test(name)) && !(/^mailto:/i.test(href) && name.includes("@")));
 
     // One name on links to different places is ambiguous however good the name is, and counting
     // destinations per name is code's job. Six cards all labelled "Card link" is the typical case.

@@ -36,6 +36,8 @@ export default defineRule({
       // In a rendered page the browser has marked what a sighted user cannot see either: closed dialogs
       // and collapsed panels, which on the corpus were nearly every report. From source this is unknown.
       .filter((el) => attr(el, "data-jev-not-visible") === undefined)
+      // Hiding an icon is what aria-hidden is for. The only text in an <svg> is its <title>, a fallback name.
+      .filter((el) => el.tagName !== "svg")
       .filter((el) => !referenced.has(attr(el, "id") ?? ""))
       .map((el) => ({ el, hidden: text(el) }))
       .filter(({ hidden }) => hidden.length > 1)

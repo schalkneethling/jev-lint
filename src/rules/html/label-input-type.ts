@@ -62,7 +62,7 @@ export default defineRule({
             name: attr(el, "name") ?? null,
           },
           // The model must not see the answer it is being checked against.
-          meta: { type: attr(el, "type") ?? "text" },
+          meta: { type: attr(el, "type") ?? "text", inputmode: attr(el, "inputmode") ?? "" },
         };
       })
       .filter(({ data }) => data.label !== null || data.placeholder !== null);
@@ -81,8 +81,11 @@ export default defineRule({
     const label = candidate.data.label ?? candidate.data.placeholder;
     const expected = OPTION_TO_TYPE[value_kind.choice]!;
     const p = 1 - matching(actualType).reduce((sum, option) => sum + value_kind.probabilities[option], 0);
+    // type="text" with a numeric inputmode is the recommended markup for digits that are not a quantity,
+    // such as the boxes of a one-time code: the author has already chosen the keyboard.
+    const digitsByDesign = actualType === "text" && value_kind.choice === "number" && ["numeric", "decimal"].includes(candidate.meta!.inputmode!);
     return {
-      p: actualType === "text" && value_kind.choice === "search" ? SEARCH_BOX_TYPED_AS_TEXT : p,
+      p: digitsByDesign ? 0 : actualType === "text" && value_kind.choice === "search" ? SEARCH_BOX_TYPED_AS_TEXT : p,
       message: `Field "${label}" asks for a ${value_kind.choice.replace("_", " ")} value, but the input is type="${actualType}".`,
       hint: `type="${expected}" matches what the label asks for.`,
     };

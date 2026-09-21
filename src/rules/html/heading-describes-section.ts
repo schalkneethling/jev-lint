@@ -5,6 +5,7 @@ import { limits } from "../limits.ts";
 
 const HEADING = /^h[1-6]$/;
 const MIN_WORDS = 12;
+const FIELDS = ["input", "select", "textarea"];
 
 /**
  * A heading over a list describes the collection, not its first member. The opening words under
@@ -25,6 +26,8 @@ function describeList(node: Element): string | undefined {
 
 interface Section {
   text: string;
+  /** A heading over a form names the task; the labels and options under it are not prose about a topic. */
+  isForm: boolean;
   /** Words outside lists. A teaser needs some, or there is nothing under its headline to compare with. */
   proseWords: number;
 }
@@ -39,14 +42,16 @@ function sectionText(heading: Element): Section {
   const siblings = start.parentNode?.childNodes ?? [];
   const parts: string[] = [];
   let proseWords = 0;
+  let fields = 0;
   for (const node of siblings.slice(siblings.indexOf(start) + 1)) {
     if ("tagName" in node && HEADING.test(node.tagName) && node.tagName <= heading.tagName) break;
     if ("tagName" in node && isConsentUi(node)) continue;
+    if ("tagName" in node) fields += (FIELDS.includes(node.tagName) ? 1 : 0) + descendants(node, FIELDS).length;
     const list = "tagName" in node ? describeList(node) : undefined;
     if (!list) proseWords += text(node).split(" ").filter(Boolean).length;
     parts.push(list ?? text(node));
   }
-  return { text: parts.join(" ").replace(/\s+/g, " ").trim(), proseWords };
+  return { text: parts.join(" ").replace(/\s+/g, " ").trim(), proseWords, isForm: fields >= 2 };
 }
 
 export default defineRule({
@@ -65,7 +70,12 @@ export default defineRule({
       .filter((el) => HEADING.test(el.tagName) && el.tagName !== "h1")
       .filter((el) => !isConsentUi(el))
       .map((el) => ({ el, heading: text(el), section: sectionText(el) }))
-      .filter(({ heading, section }) => heading !== "" && section.text.split(" ").length >= MIN_WORDS)
+      // "· · ·" is a divider set in a heading element, with no topic to check.
+      .filter(({ heading, section }) => /\p{L}/u.test(heading) && section.text.split(" ").length >= MIN_WORDS)
+      // Blind labels: headings over a form or a dialog ("Book a Meeting") were judged against option lists
+      // ("Country* United States Canada Afghanistan …"). They name what the form does, and whether that is
+      // true of the fields is not this rule's question. One search box does not make a section a form.
+      .filter(({ section }) => !section.isForm)
       // A headline that links to its article is a teaser. Under it sit bylines, tags, and related links,
       // which are about the article but do not read like it: on the corpus, news headlines over a list
       // of three authors scored 0.95. A teaser is judged only when it has an excerpt to be judged against.
@@ -79,7 +89,7 @@ export default defineRule({
     on_topic: noul(
       `${ref("heading")} is a heading on a web page and ${ref("content_under_heading")} is the beginning of the content directly under it. Is the content about the topic that the heading names?`,
       {
-        true: "A reader who skipped to this heading because of its wording would find the topic they expected.",
+        true: 'A reader who skipped to this heading because of its wording would find the topic they expected. A heading that invites an action ("Create an account", "Follow us", "Get in touch") fits content that leads to that action: the reasons to do it, or the places to do it.',
         false:
           "The content is about a different topic than the heading names, so a reader who skipped to this heading would be misled. The heading may be left over from a template or from earlier content.",
       },

@@ -147,3 +147,53 @@ test("an element inside an accessibility overlay is still a candidate, marked as
   );
   assert.deepEqual(candidates.map((c) => c.loc.widget), ["accessibility overlay", undefined]);
 });
+
+test("link-text-purpose leaves a phone number on a tel: link and an address on a mailto: link alone", async () => {
+  const { default: rule } = await import("../src/rules/html/link-text-purpose.ts");
+  const candidates = rule.select(
+    parseHtml("t.html", `<a href="tel:+18005550100">(800) 555-0100</a><a href="mailto:hi@example.org">hi@example.org</a><a href="tel:+18005550100">click here</a>`),
+  );
+  assert.deepEqual(candidates.map((c) => c.data.link_text), ["click here"]);
+});
+
+test("aria-label-justified ignores a link whose only visible text is an image's alt", async () => {
+  const { default: rule } = await import("../src/rules/html/aria-label-justified.ts");
+  const candidates = rule.select(
+    parseHtml("t.html", `<a href="/a" aria-label="Eight ideas"><img src="a.jpg" alt="A building"></a><a href="/b" aria-label="Close">Open</a>`),
+  );
+  assert.deepEqual(candidates.map((c) => c.data.visible_text), ["Open"]);
+});
+
+test("heading-describes-section skips a heading over a form, but one search box does not make a form", () => {
+  const prose = "We answer within two working days and never share what you send us with anybody else at all.";
+  const candidates = select(
+    headingDescribesSection,
+    `<h2>Book a meeting</h2><form><p>${prose}</p><input name="email"><select><option>Afghanistan</option></select></form>
+     <h2>About us</h2><p>${prose}</p><input type="search" name="q">`,
+  );
+  assert.deepEqual(candidates.map((c) => c.data.heading), ["About us"]);
+});
+
+test("describedby-describes decides in code that a description repeating the label is a defect", async () => {
+  const { default: rule } = await import("../src/rules/html/describedby-describes.ts");
+  const [repeat, help] = rule.select(
+    parseHtml(
+      "t.html",
+      `<label for="l">Last *</label><input id="l" aria-describedby="d1"><span id="d1">Last</span>
+       <label for="e">Email</label><input id="e" aria-describedby="d2"><span id="d2">We only use it for receipts.</span>`,
+    ),
+  );
+  assert.equal(repeat!.decided?.p, 0.7);
+  assert.equal(help!.decided, undefined);
+});
+
+test("autocomplete-matches-label skips search boxes and fields nobody can type into", async () => {
+  const { default: rule } = await import("../src/rules/html/autocomplete-matches-label.ts");
+  const candidates = rule.select(
+    parseHtml(
+      "t.html",
+      `<label>Find <input name="keys" id="headerSearch"></label><label>Total <input name="total" disabled></label><label>City <input name="city"></label>`,
+    ),
+  );
+  assert.deepEqual(candidates.map((c) => c.data.label), ["City"]);
+});
