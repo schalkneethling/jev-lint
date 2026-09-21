@@ -88,6 +88,8 @@ textarea { font: inherit; color: var(--ink); background: var(--ground); border: 
 (() => {
   const stage = document.getElementById("stage");
   const LABELS = { yes: "The claim is true", no: "The claim is false", unsure: "Cannot tell" };
+  // The bench serves both corpora: a sample of rendered pages, and a sample of open-source source files.
+  const HTML_KINDS = ["home", "form", "article"];
   let db = null;
   let items = [];
   let labels = new Map();
@@ -143,13 +145,14 @@ textarea { font: inherit; color: var(--ink); background: var(--ground); border: 
     skip.addEventListener("click", nextUnlabelled);
 
     stage.replaceChildren(el("article", { className: "item" }, [
-      el("div", { className: "meta" }, [el("span", {}, [el("b", { textContent: `${index + 1}` }), ` of ${items.length}`]), el("span", { textContent: item.rule }), el("span", { textContent: `${item.kind} page · ${item.band}` })]),
+      el("div", { className: "meta" }, [el("span", {}, [el("b", { textContent: `${index + 1}` }), ` of ${items.length}`]), el("span", { textContent: item.rule }), el("span", { textContent: `${item.kind} ${HTML_KINDS.includes(item.kind) ? "page" : "file"} · ${item.band}` })]),
       el("p", { className: "rule-says", textContent: `What this rule is about: ${item.ruleDescription}` }),
       el("div", { className: "claim" }, [el("p", { className: "label", textContent: "The claim" }), el("h2", { textContent: item.claim }), item.hint ? el("p", { className: "hint", textContent: item.hint }) : ""]),
-      el("section", { className: "block" }, [el("p", { className: "label", textContent: "The element" }), el("pre", { textContent: item.snippet || "(no source quoted)" })]),
+      el("section", { className: "block" }, [el("p", { className: "label", textContent: HTML_KINDS.includes(item.kind) ? "The element" : "The source" }), el("pre", { textContent: item.snippet || "(no source quoted)" })]),
       el("section", { className: "block" }, [el("p", { className: "label", textContent: "The words the model was shown" }), definition(item.checked)]),
       Object.keys(item.facts ?? {}).length ? el("section", { className: "block" }, [el("p", { className: "label", textContent: "What code established" }), definition(item.facts)]) : "",
-      el("p", {}, [el("span", { className: "label", textContent: "Page " }), el("a", { href: item.page, target: "_blank", rel: "noopener noreferrer", textContent: item.page })]),
+      // A page is named by a URL a labeller can open; a file is named by its repository, path, and line, which is not a link.
+      el("p", {}, [el("span", { className: "label", textContent: "From " }), item.page.includes("://") ? el("a", { href: item.page, target: "_blank", rel: "noopener noreferrer", textContent: item.page }) : el("code", { textContent: item.page })]),
       el("div", { className: "answer" }, [el("div", { className: "buttons" }, buttons), note, status]),
       el("div", { className: "nav" }, [previous, skip, next]),
     ]));

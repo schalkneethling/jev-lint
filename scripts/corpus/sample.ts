@@ -10,7 +10,8 @@
 // <corpus>/label-sample-blind.json, the same items in one document to hand over.
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
-import { htmlRules } from "../../src/rules/index.ts";
+import { allRules, htmlRules } from "../../src/rules/index.ts";
+import { readCorpus } from "./corpus.ts";
 
 const { values } = parseArgs({
   options: { corpus: { type: "string", default: "corpus" }, reported: { type: "string", default: "8" }, unreported: { type: "string", default: "5" }, seed: { type: "string", default: "1" }, exclude: { type: "string", multiple: true } },
@@ -40,21 +41,34 @@ const next = () => {
 };
 const shuffled = <T>(items: T[]): T[] => items.map((item) => [next(), item] as const).sort(([a], [b]) => a - b).map(([, item]) => item);
 
-/**
- * Round-robin over the page kinds, keeping each kind's own order. A rule behaves differently on a home
- * page, a form, and an article — `description-matches-page` only classifies articles at all — and taking the
- * first n of a list sorted by anything else gave whichever kind happens to be most common.
- */
-function acrossKinds(items: Saved[]): Saved[] {
-  const queues = [...new Set(items.map((j) => j.kind))].map((kind) => items.filter((j) => j.kind === kind));
-  const out: Saved[] = [];
+function roundRobin<T>(queues: T[][]): T[] {
+  const out: T[] = [];
   while (queues.some((queue) => queue.length > 0)) for (const queue of queues) if (queue.length > 0) out.push(queue.shift()!);
   return out;
 }
 
+/**
+ * The one thing a rule's sample must not be dominated by: the site a page came from, or the repository a
+ * file came from. One repository's house style runs through every file in it, so eight reports from it
+ * would measure that house and not the rule. `page` is a URL for a page and `owner/repo: path:line` for a file.
+ */
+const sourceOf = (j: Saved) => (j.page.includes("://") ? new URL(j.page).origin : j.page.split(": ")[0]!);
+
+/**
+ * Round-robin over the kinds, and within each kind over the sites or repositories, keeping each queue's own
+ * order. A rule behaves differently on a home page, a form, and an article — `description-matches-page` only
+ * classifies articles at all, and `test-title-matches-body` only classifies tests — and taking the first n of
+ * a list sorted by anything else gave whichever kind, and whichever repository, happens to be most common.
+ */
+function acrossKinds(items: Saved[]): Saved[] {
+  const queuesFor = (of: Saved[], key: (j: Saved) => string) => [...new Set(of.map(key))].map((value) => of.filter((j) => key(j) === value));
+  return roundRobin(queuesFor(items, (j) => j.kind).map((ofKind) => roundRobin(queuesFor(ofKind, sourceOf))));
+}
+
+const corpus = readCorpus(values.corpus);
 const all: Saved[] = JSON.parse(readFileSync(`${values.corpus}/classifications.json`, "utf8"));
 const sample: Saved[] = [];
-const rules = htmlRules.filter((rule) => !(values.exclude ?? []).includes(rule.id));
+const rules = (corpus.code ? allRules : htmlRules).filter((rule) => !(values.exclude ?? []).includes(rule.id));
 for (const rule of rules) {
   const seen = new Set<string>();
   const distinct = shuffled(all.filter((j) => j.rule === rule.id)).filter((j) => {
@@ -82,10 +96,19 @@ for (const rule of rules) {
 // worth of "true" for a claim nobody made. So its claim is stated from the facts alone.
 const CLAIMS: Record<string, (j: Saved) => string> = {
   "label-input-type": (j) => `Field "${j.checked.label ?? j.checked.placeholder}" has type="${j.facts.type}", and that type does not suit what the field asks for.`,
+  // The rule's own message ends "Say why, or remove it", which is advice to an author rather than something
+  // a labeller can call true or false. Stated as the claim the label is actually about.
+  "comment-gives-reason": (j) => `Comment "${j.checked.comment}" only restates what the code below it already says.`,
+  // Two messages, one for a catch block holding a comment and one for a catch block holding nothing, would
+  // tell a labeller which of the two the tool decided in code. One wording, stated from the facts, for both.
+  "swallowed-error-justified": (j) =>
+    j.checked.comment_in_empty_catch
+      ? `Nothing in this catch block says why ignoring the error is safe: its only comment is "${j.checked.comment_in_empty_catch}".`
+      : "Nothing in this catch block says why ignoring the error is safe: it holds no comment at all.",
 };
 
 const ordered = shuffled(sample);
-const description = new Map(htmlRules.map((rule) => [rule.id, rule.description]));
+const description = new Map(allRules.map((rule) => [rule.id, rule.description]));
 writeFileSync(`${values.corpus}/label-sample.json`, JSON.stringify(ordered, null, 1));
 // One file per item, so the bench can be loaded by file path and no page text passes through a prompt.
 const itemsDir = `${values.corpus}/label-items`;
@@ -98,14 +121,21 @@ const items = ordered.map((j, n) => {
 });
 // The same items in one document, for a labeller who is not running the bench. Neither form carries a
 // probability or a severity: what the tool concluded is exactly what the labels are there to check.
-const { seed } = JSON.parse(readFileSync(`${values.corpus}/manifest.json`, "utf8")) as { seed: number };
-writeFileSync(`${values.corpus}/label-sample-blind.json`, JSON.stringify({ createdFor: `seed-${seed} Tranco corpus, blind labelling round`, items }));
+const drawnFrom = corpus.code ? "open-source JavaScript and TypeScript corpus" : "Tranco corpus";
+writeFileSync(`${values.corpus}/label-sample-blind.json`, JSON.stringify({ createdFor: `seed-${corpus.seed} ${drawnFrom}, blind labelling round`, items }));
 
 console.table(
   rules.map((rule) => {
     const mine = ordered.filter((j) => j.rule === rule.id);
     const kinds = [...new Set(mine.map((j) => j.kind))].map((kind) => `${kind} ${mine.filter((j) => j.kind === kind).length}`);
-    return { rule: rule.id, reported: mine.filter((j) => j.severity !== null).length, unreported: mine.filter((j) => j.severity === null).length, kinds: kinds.join(", ") };
+    return {
+      rule: rule.id,
+      reported: mine.filter((j) => j.severity !== null).length,
+      unreported: mine.filter((j) => j.severity === null).length,
+      // A rule's items spread over one repository or site are eight measurements of that house style.
+      [corpus.code ? "repos" : "sites"]: new Set(mine.map(sourceOf)).size,
+      kinds: kinds.join(", "),
+    };
   }),
 );
 console.log(`${ordered.length} items`);

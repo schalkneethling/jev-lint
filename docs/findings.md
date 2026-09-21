@@ -914,7 +914,59 @@ Every rule that was removed asked for something open: is this heading apt, is th
 does a user need these words. The vocabulary in the code and these documents follows: rules classify,
 the engine keeps classifications, and a rule that cannot state its classes does not belong here.
 
-## 22. Working rules for writing a Jev lint
+## 22. A corpus of source code
+
+The code rules had met only fixtures by their author and two real files, which is where the HTML rules
+stood before §16. `scripts/corpus/fetch-code.ts` samples open-source repositories the way `fetch.ts`
+samples sites: seeded, JavaScript and TypeScript, four star bands from 10 to over 10,000, permissive
+licences, not forks, not archived, pushed within two years. Each repository is cloned shallowly and
+reduced to 8 to 11 files, filling tests and JSX first because plain source otherwise fills the quota.
+Generated, bundled, minified, declaration, very short and very long files are left out.
+
+64 repositories, 558 files: 354 source, 158 tests, 46 JSX. Only the manifest is committed. One set of
+scripts reads both kinds of corpus (`scripts/corpus/corpus.ts`).
+
+| Rule | Files with a candidate | Candidates | Reported |
+| --- | --- | --- | --- |
+| `function-name-matches-body` | 55% | 1,608 | 14% |
+| `comment-describes-code` | 48% | 2,306 | 10% (17% before the fix below) |
+| `comment-gives-reason` | 48% | 2,306 | 26% |
+| `test-title-matches-body` | 21% | 1,309 | 2% |
+| `swallowed-error-justified` | 3% | 28 | 79% |
+| the nine HTML rules, on JSX | 1% | 19, of which 8 classified | |
+
+7,565 classifications for $0.12 in five minutes.
+
+**One extraction fault was fixed before labelling**, because it would have spent the labeller on a known
+error. A comment was paired with the one statement under it, so "Calculate amount from line items" was
+classified against `let total = 0;` and found untrue of it. A lone declaration was 17% of candidates and
+38% of reports. A comment heads a paragraph: it is now paired with the code up to the next blank line or
+comment. Reports fell from 17% to 10% of candidates.
+
+**What the reports show, left for the labels to weigh:**
+
+- `comment-gives-reason` reports section dividers ("Enums", "UMD build") and comments on data and
+  configuration, where restating is all a comment can do. 107 of 500 reports are on comments of one or two
+  words. Commented-out code is selected as if it were prose. All three are kinds of comment, which is what
+  the router proposed in `docs/jev-conditionals.md` would classify.
+- `swallowed-error-justified` reports 79%, but 14 of 22 are decided in code (an empty catch with no
+  comment). Where Jev classifies, a comment that names the expected failure ("Not pnpm", "ignore ENOENT")
+  is a reason its criteria do not list, and "See above." cannot be classified from the candidate at all.
+  At 28 candidates in 558 files the rule is thin whatever its accuracy.
+- `function-name-matches-body`: 43% of reports come from 5 of 61 repositories, each with a house style
+  (every `getX` mutates `this`). Names a framework dictates (`didMount`, `willRevert`, a Proxy's `get`)
+  are not the author's to choose, and the name filter misses them.
+- `test-title-matches-body` is nearly silent, and 7 of its 26 reports are tests with no assertion at all,
+  which a parser can find and which is a different defect from a wrong title.
+- **The HTML rules find almost nothing in JSX.** 70 files hold 722 JSX elements; 373 are components, the
+  rest mostly `div`, `span` and `p`; and where a rule's element appears its words are computed (`alt` is a
+  string but `src` is an import, so the candidate is dropped). More JSX would not change this. In real
+  component code the words these rules classify live in props and data, not in markup.
+
+The blind sample is 72 items, drawn across repositories as well as kinds so that no house style can
+dominate a rule.
+
+## 23. Working rules for writing a Jev lint
 
 −1. Ask for the defect, not the virtue. "Is this specific enough?" has no boundary and a literal reader
    fails everything; "is this only filler?" is bounded. When one rule produces a uniform cluster of

@@ -124,3 +124,11 @@ test("function-name-matches-body leaves out functions named for when they run", 
   const doc = await parseCode("f.ts", `function onEnd() {} function handleClick() {} class A { attributeChangedCallback() {} getUser() {} }`);
   assert.deepEqual(rule.select(doc).map((c) => c.data.name), ["getUser"]);
 });
+
+test("a comment is paired with the paragraph of code under it, up to the next blank line or comment", async () => {
+  const doc = await parseCode(
+    "t.ts",
+    `// Calculate amount from line items\nlet total = 0;\nfor (const item of items) total += item.amount;\n\nconsole.log(total);\n// Report it\nsend(total);\n// then stop\nstop();\n`,
+  );
+  assert.deepEqual(doc.comments.map((c) => c.code), ["let total = 0;\nfor (const item of items) total += item.amount;", "send(total);", "stop();"]);
+});

@@ -2,22 +2,19 @@
 // that appears on one page in a hundred is worth little, and this costs nothing to find out: every
 // number here comes from the parser. Run it before writing a rule, not after.
 //
-//   node scripts/corpus/prevalence.ts [--corpus corpus] [--kind home|form|article]
+//   node scripts/corpus/prevalence.ts [--corpus corpus] [--kind home|form|article|source|test|jsx]
 import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
+import { parseJsx } from "../../src/code/jsx.ts";
+import { parseCode } from "../../src/code/parse.ts";
 import { attr, descendants, fieldLabel, parseHtml, text, type HtmlDoc } from "../../src/html/parse.ts";
-import { htmlRules } from "../../src/rules/index.ts";
+import { allRules } from "../../src/rules/index.ts";
+import { readCorpus } from "./corpus.ts";
 
 const { values } = parseArgs({ options: { corpus: { type: "string", default: "corpus" }, kind: { type: "string" } } });
 
-interface Page {
-  file: string;
-  kind: "home" | "form" | "article";
-  band: string;
-}
-
-const manifest: { pages: Page[] } = JSON.parse(readFileSync(`${values.corpus}/manifest.json`, "utf8"));
-const pages = manifest.pages.filter((page) => !values.kind || page.kind === values.kind);
+const corpus = readCorpus(values.corpus);
+const files = corpus.files.filter((file) => !values.kind || file.kind === values.kind);
 
 // Situations no rule covers yet. Each is what a candidate for a possible rule would be.
 const PROPOSED: Record<string, (doc: HtmlDoc) => number> = {
@@ -39,22 +36,29 @@ const PROPOSED: Record<string, (doc: HtmlDoc) => number> = {
 const counts = new Map<string, number[]>();
 const record = (name: string, count: number) => counts.set(name, [...(counts.get(name) ?? []), count]);
 
-for (const page of pages) {
-  const doc = parseHtml(page.file, readFileSync(page.file, "utf8"));
-  for (const rule of htmlRules) record(`rule: ${rule.id}`, rule.select(doc).length);
-  for (const [name, count] of Object.entries(PROPOSED)) record(`idea: ${name}`, count(doc));
+for (const entry of files) {
+  const source = readFileSync(entry.file, "utf8");
+  // The same two readings `run()` gives a source file: as code, and for the markup in its JSX. The ideas
+  // below are all about rendered markup, so a code corpus, whose HTML is whatever JSX states outright,
+  // is counted for the rules alone.
+  const docs = corpus.code
+    ? ([["code", await parseCode(entry.file, source)], ["html", await parseJsx(entry.file, source)]] as const)
+    : ([["html", parseHtml(entry.file, source)]] as const);
+  for (const [target, doc] of docs) for (const rule of allRules) if (rule.target === target) record(`rule: ${rule.id}`, rule.select(doc).length);
+  if (!corpus.code) for (const [name, count] of Object.entries(PROPOSED)) record(`idea: ${name}`, count(docs[0]![1] as HtmlDoc));
 }
 
 const median = (values: number[]) => values.toSorted((a, b) => a - b)[Math.floor(values.length / 2)] ?? 0;
+const unit = corpus.code ? "files" : "pages";
 const rows = [...counts].map(([situation, perPage]) => {
   const present = perPage.filter((count) => count > 0);
   return {
     situation,
-    "pages with it": `${present.length}/${perPage.length}`,
+    [`${unit} with it`]: `${present.length}/${perPage.length}`,
     share: `${Math.round((present.length / perPage.length) * 100)}%`,
     candidates: perPage.reduce((sum, count) => sum + count, 0),
     "median where present": median(present),
   };
 });
-console.log(`${pages.length} pages${values.kind ? ` (${values.kind})` : ""}`);
+console.log(`${files.length} ${unit}${values.kind ? ` (${values.kind})` : ""}`);
 console.table(rows.sort((a, b) => parseInt(b.share) - parseInt(a.share)));
