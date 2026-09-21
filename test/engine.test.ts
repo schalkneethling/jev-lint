@@ -163,3 +163,23 @@ test("cache-only mode never asks, judges what the cache answers, and counts the 
   assert.deepEqual(judgements.map((j) => j.candidate.data.link_text), ["click here"]);
   assert.deepEqual([stats.requests, stats.unanswered], [0, 1]);
 });
+
+test("a pattern repeated across a file is reported once with every place, while judgements stay per element", async () => {
+  const { default: ariaLabelJustified } = await import("../src/rules/html/aria-label-justified.ts");
+  const { ask } = fakeAsk();
+  const source = `<a href="/a" aria-label="Blog">Blog</a>\n<a href="/b" aria-label="Docs">Docs</a>\n<a href="/c" aria-label="About">About</a>`;
+  const { findings, judgements } = await run([{ path: "p.html", source }], { rules: [ariaLabelJustified], ask, isolation: "candidate" });
+  assert.equal(judgements.length, 3);
+  assert.equal(findings.length, 1);
+  assert.match(findings[0]!.message, /^3 elements in this file: the aria-label repeats/);
+  assert.deepEqual(findings[0]!.occurrences!.map(({ loc }) => loc.line), [1, 2, 3]);
+  assert.equal(findings[0]!.loc.line, 1);
+});
+
+test("a pattern that occurs once keeps its own message", async () => {
+  const { default: ariaLabelJustified } = await import("../src/rules/html/aria-label-justified.ts");
+  const { ask } = fakeAsk();
+  const { findings } = await run([{ path: "p.html", source: `<a href="/a" aria-label="Blog">Blog</a>` }], { rules: [ariaLabelJustified], ask, isolation: "candidate" });
+  assert.match(findings[0]!.message, /^aria-label "Blog" repeats/);
+  assert.equal(findings[0]!.occurrences, undefined);
+});

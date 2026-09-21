@@ -55,7 +55,11 @@ export default defineRule({
         };
         // An exact repeat changes nothing a user hears. It is clutter that can drift, not a defect.
         if (relation === "same") {
-          candidate.decided = { p: 0.45, message: `aria-label "${label}" repeats the visible text exactly; it adds nothing and can drift out of step with it.` };
+          candidate.decided = {
+            p: 0.45,
+            message: `aria-label "${label}" repeats the visible text exactly; it adds nothing and can drift out of step with it.`,
+            pattern: "the aria-label repeats the visible text exactly; it adds nothing and can drift out of step with it.",
+          };
         }
         return candidate;
       });
@@ -98,6 +102,7 @@ export default defineRule({
         : {
             p: LABEL_NOT_IN_NAME,
             message: `aria-label "${aria_label}" does not contain the visible text "${visible_text}", so a voice control user may not be able to activate it by saying what they see (WCAG 2.5.3).`,
+            pattern: "the aria-label does not contain the visible text, so a voice control user may not be able to activate the control by saying what they see (WCAG 2.5.3).",
           };
     }
     // A label that adds the subject is welcome even where it was not strictly needed ("Accept" with

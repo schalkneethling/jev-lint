@@ -37,6 +37,7 @@ function finding(f: Finding): string {
   </div>
   <p class="message">${esc(f.message)}</p>
   ${f.hint ? `<p class="hint">${esc(f.hint)}</p>` : ""}
+  ${f.occurrences ? `<p class="places">At lines ${f.occurrences.map(({ loc }) => loc.line).join(", ")}</p>` : ""}
   ${evidence(f)}
 </li>`;
 }
@@ -111,6 +112,7 @@ ul.findings { list-style: none; margin: 0; padding: 0 0 0 16px; border-inline-st
 .p { font: 500 0.8rem/1 var(--mono); font-variant-numeric: tabular-nums; }
 .message { max-inline-size: 70ch; }
 .hint { color: var(--jev); max-inline-size: 70ch; }
+.places { color: var(--muted); max-inline-size: 70ch; font-variant-numeric: tabular-nums; }
 .evidence { margin: 4px 0 0; display: grid; gap: 2px; font: 400 0.78rem/1.5 var(--mono); color: var(--muted); }
 .evidence div { display: grid; grid-template-columns: minmax(0, 17rem) 1fr; gap: 12px; }
 .evidence dt, .evidence dd { margin: 0; overflow-wrap: anywhere; }

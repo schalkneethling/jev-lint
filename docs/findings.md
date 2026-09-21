@@ -758,6 +758,10 @@ deadline.
    at a fixed 0.45 with no judgement involved: 732 labels that repeat the visible text exactly (case
    differences included) and 503 labels that do not contain it. The 129 errors and warnings, the part
    Jev judged, are buried under them. This is a reporting-policy question, not a prompt question.
+   Decision: merge in the report. An assessment may name a `pattern`, worded for any number of elements;
+   findings of one rule that share a pattern in one file become one finding at the first place, listing
+   every other. Judgements stay per element, so measurement is unchanged. The rule's 1,470 reports on
+   102 pages become 373.
 2. `aria-hidden-hides-content` reports 68%, piled between 0.4 and 0.6. With invisible content stamped
    out, what remains is visible duplication: the option list of a custom select, repeated marquee
    copies, a mobile and a desktop copy of one menu or price, text inside product mock-ups. The rule

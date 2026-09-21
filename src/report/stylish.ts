@@ -7,6 +7,9 @@ const COLORS = { error: "red", warn: "yellow", review: "cyan" } as const satisfi
 // Input tokens only; Jev does not charge for output. See https://docs.typesafe.ai/models
 const USD_PER_MILLION_TOKENS = 0.042;
 
+// A merged finding lists where it occurs. The JSON report has them all; a terminal needs only enough to start.
+const SHOWN_PLACES = 8;
+
 const dim = (value: string) => styleText("dim", value);
 
 function measurement(value: Finding["measurements"][string]): string {
@@ -23,6 +26,10 @@ export function stylish(findings: Finding[], stats: RunStats, options: { evidenc
       for (const f of element.findings) {
         lines.push(`    ${styleText(COLORS[f.severity], f.severity.padEnd(6))} ${f.message}  ${dim(`${f.ruleId} p=${f.p.toFixed(2)}`)}`);
         if (f.hint) lines.push(`           ${f.hint}`);
+        if (f.occurrences) {
+          const places = f.occurrences.map(({ loc }) => `${loc.line}:${loc.col}`);
+          lines.push(dim(`           at ${places.slice(0, SHOWN_PLACES).join(", ")}${places.length > SHOWN_PLACES ? ` and ${places.length - SHOWN_PLACES} more` : ""}`));
+        }
         const approved = (f.axe ?? []).filter((a) => a.checksSameThing && a.outcome === "passed");
         if (approved.length > 0) lines.push(`           ${styleText("magenta", "valid but false")}  axe passed ${approved.map((a) => a.rule).join(", ")} on this element`);
         if (!options.evidence) continue;

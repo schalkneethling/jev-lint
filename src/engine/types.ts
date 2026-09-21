@@ -30,6 +30,11 @@ export interface Assessment {
   message: string;
   /** A fact code holds that points at the fix, such as the nearest heading or the right `type`. */
   hint?: string;
+  /**
+   * Set when the same small defect tends to repeat across a page, worded for any number of elements.
+   * Findings of one rule that share a pattern in one file are reported once, with every place listed.
+   */
+  pattern?: string;
 }
 
 export type Severity = "error" | "warn" | "review";
@@ -130,6 +135,8 @@ export interface Finding extends Assessment {
   facts: { [key: string]: string };
   /** What axe concluded about the same element, when an axe report was supplied. */
   axe?: { rule: string; outcome: "passed" | "failed"; help: string; checksSameThing: boolean }[];
+  /** Every element a repeated pattern was found on, the first included. Set only on a merged finding. */
+  occurrences?: { loc: Loc; snippet?: string; checked: Candidate["data"] }[];
 }
 
 export interface RunStats {

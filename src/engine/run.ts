@@ -81,6 +81,7 @@ function toFinding(j: Judgement, severity: Finding["severity"], { source, axe }:
     p: j.p,
     message: j.message,
     ...(j.hint !== undefined && { hint: j.hint }),
+    ...(j.pattern !== undefined && { pattern: j.pattern }),
     ...(quoted && { snippet: quoted.length > SNIPPET_LIMIT ? `${quoted.slice(0, SNIPPET_LIMIT)}…` : quoted }),
     checked: j.candidate.data,
     measurements: Object.fromEntries(Object.entries(j.answers).map(([name, answer]) => [name, measurementOf(answer)])),
@@ -89,6 +90,24 @@ function toFinding(j: Judgement, severity: Finding["severity"], { source, axe }:
       axe: onElement.map(({ rule, outcome, help }) => ({ rule, outcome, help, checksSameThing: (FORM_CHECKS[j.ruleId] ?? []).includes(rule) })),
     }),
   };
+}
+
+/**
+ * A page that repeats its visible text in two hundred aria-labels has one habit, not two hundred defects.
+ * Judgements stay per element; only the report merges them, at the first place the pattern occurs.
+ */
+export function mergePatterns(findings: Finding[]): Finding[] {
+  const groups = Map.groupBy(findings, (f) => (f.pattern === undefined ? Symbol() : `${f.file}\0${f.ruleId}\0${f.severity}\0${f.pattern}`));
+  return [...groups.values()].map((group) => {
+    const [first] = group;
+    if (group.length === 1) return first!;
+    return {
+      ...first!,
+      p: Math.max(...group.map((f) => f.p)),
+      message: `${group.length} elements in this file: ${first!.pattern}`,
+      occurrences: group.map(({ loc, snippet, checked }) => ({ loc, ...(snippet !== undefined && { snippet }), checked })),
+    };
+  });
 }
 
 export async function run(files: SourceFile[], options: RunOptions): Promise<RunResult> {
@@ -184,8 +203,7 @@ export async function run(files: SourceFile[], options: RunOptions): Promise<Run
 
   const judgements = [...decided, ...(await pool(tasks, concurrency)).flat()];
   const sources = new Map(files.map((file) => [file.path, file]));
-  const findings: Finding[] = judgements
-    .flatMap((j) => (j.severity === null ? [] : [toFinding(j, j.severity, sources.get(j.file)!)]))
+  const findings: Finding[] = mergePatterns(judgements.flatMap((j) => (j.severity === null ? [] : [toFinding(j, j.severity, sources.get(j.file)!)])))
     .sort((a, b) => a.file.localeCompare(b.file) || a.loc.line - b.loc.line || a.loc.col - b.loc.col);
 
   return { judgements, findings, stats };

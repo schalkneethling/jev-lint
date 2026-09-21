@@ -12,7 +12,7 @@ export function json(findings: Finding[], stats: RunStats): string {
     line: loc.line,
     column: loc.col,
     snippet,
-    findings: group.map(({ ruleId, severity, p, message, hint, checked, measurements, facts, axe }) => ({
+    findings: group.map(({ ruleId, severity, p, message, hint, checked, measurements, facts, axe, occurrences }) => ({
       rule: ruleId,
       severity,
       probability: Number(p.toFixed(3)),
@@ -22,6 +22,7 @@ export function json(findings: Finding[], stats: RunStats): string {
       measurements,
       facts,
       axe,
+      occurrences: occurrences?.map(({ loc, snippet, checked }) => ({ line: loc.line, column: loc.col, snippet, checked })),
     })),
   }));
   return JSON.stringify({ elements, stats }, null, 2);
