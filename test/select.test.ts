@@ -139,3 +139,11 @@ test("description-matches-page judges article pages only, one candidate each, an
   const [candidate] = select(rule, page("See what each plan includes."));
   assert.deepEqual([candidate!.data.meta_description, candidate!.data.page_title, candidate!.data.main_heading], ["See what each plan includes.", "Pricing | Acme", "Pricing"]);
 });
+
+test("an element inside an accessibility overlay is still a candidate, marked as a third-party widget", async () => {
+  const { default: rule } = await import("../src/rules/html/alert-is-urgent.ts");
+  const candidates = rule.select(
+    parseHtml("t.html", `<div class="uwaw-features"><span aria-live="assertive">Bigger Text</span></div><p role="alert">Payment failed</p>`),
+  );
+  assert.deepEqual(candidates.map((c) => c.loc.widget), ["accessibility overlay", undefined]);
+});

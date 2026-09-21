@@ -84,7 +84,7 @@ function toFinding(j: Judgement, severity: Finding["severity"], { source, axe }:
     ...(quoted && { snippet: quoted.length > SNIPPET_LIMIT ? `${quoted.slice(0, SNIPPET_LIMIT)}…` : quoted }),
     checked: j.candidate.data,
     measurements: Object.fromEntries(Object.entries(j.answers).map(([name, answer]) => [name, measurementOf(answer)])),
-    facts: j.candidate.meta ?? {},
+    facts: { ...j.candidate.meta, ...(j.candidate.loc.widget && { "third-party widget": j.candidate.loc.widget }) },
     ...(onElement && {
       axe: onElement.map(({ rule, outcome, help }) => ({ rule, outcome, help, checksSameThing: (FORM_CHECKS[j.ruleId] ?? []).includes(rule) })),
     }),

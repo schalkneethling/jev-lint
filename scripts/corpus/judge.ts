@@ -72,7 +72,7 @@ const saved = judgements.map((j, index) => {
     hint: j.hint,
     snippet: span ? sources.get(j.file)!.slice(span.start, Math.min(span.end, span.start + 400)).replace(/ data-jev-axe="[^"]*"/g, "").replace(/\s+/g, " ") : "",
     checked: j.candidate.data,
-    facts: j.candidate.meta ?? {},
+    facts: { ...j.candidate.meta, ...(j.candidate.loc.widget && { "third-party widget": j.candidate.loc.widget }) },
     axePassed: onElement.filter((result) => result.outcome === "passed").map((result) => result.rule),
   };
 });

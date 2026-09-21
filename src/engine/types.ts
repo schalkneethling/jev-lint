@@ -9,6 +9,8 @@ export interface Loc {
   span?: { start: number; end: number };
   /** Indexes into the page's axe results for this element, when an axe report was supplied. */
   axe?: number[];
+  /** The third-party widget this element belongs to, which the page's author cannot edit. */
+  widget?: "accessibility overlay";
 }
 
 /** A small, self-contained slice of a file for Jev to judge. `data` is all the model sees. */

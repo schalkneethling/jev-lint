@@ -2,7 +2,7 @@
 // that appears on one page in a hundred is worth little, and this costs nothing to find out: every
 // number here comes from the parser. Run it before writing a rule, not after.
 //
-//   node scripts/corpus/prevalence.ts [--corpus corpus] [--kind home|form]
+//   node scripts/corpus/prevalence.ts [--corpus corpus] [--kind home|form|article]
 import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { attr, descendants, fieldLabel, parseHtml, text, type HtmlDoc } from "../../src/html/parse.ts";
@@ -12,7 +12,7 @@ const { values } = parseArgs({ options: { corpus: { type: "string", default: "co
 
 interface Page {
   file: string;
-  kind: "home" | "form";
+  kind: "home" | "form" | "article";
   band: string;
 }
 

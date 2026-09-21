@@ -56,6 +56,10 @@ export default defineRule({
     const repeats = repeats_caption?.noul ?? 0;
     return is_placeholder.noul >= repeats
       ? { p: is_placeholder.noul, message: `Alt text "${candidate.data.alt}" is a file name or placeholder, not a description.` }
-      : { p: repeats, message: `Alt text "${candidate.data.alt}" repeats the visible caption, so it is read out twice.` };
+      : {
+          p: repeats,
+          message: `Alt text "${candidate.data.alt}" repeats the visible caption, so it is read out twice.`,
+          hint: "Alt text says what the image shows; a caption adds context to it. They do different jobs.",
+        };
   },
 });

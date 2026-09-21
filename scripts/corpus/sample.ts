@@ -6,7 +6,8 @@
 //   node scripts/corpus/sample.ts [--corpus corpus] [--reported 8] [--unreported 5] [--seed 1] [--exclude <rule>]...
 //
 // Writes <corpus>/label-sample.json, which keeps the probabilities and severities the labeller must
-// not see, and <corpus>/label-items/<id>.json, the blind items to load into the label bench.
+// not see; <corpus>/label-items/<id>.json, the blind items to load into the label bench; and
+// <corpus>/label-sample-blind.json, the same items in one document to hand over.
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { htmlRules } from "../../src/rules/index.ts";
@@ -39,6 +40,18 @@ const next = () => {
 };
 const shuffled = <T>(items: T[]): T[] => items.map((item) => [next(), item] as const).sort(([a], [b]) => a - b).map(([, item]) => item);
 
+/**
+ * Round-robin over the page kinds, keeping each kind's own order. A rule behaves differently on a home
+ * page, a form, and an article — `description-matches-page` only judges articles at all — and taking the
+ * first n of a list sorted by anything else gave whichever kind happens to be most common.
+ */
+function acrossKinds(items: Saved[]): Saved[] {
+  const queues = [...new Set(items.map((j) => j.kind))].map((kind) => items.filter((j) => j.kind === kind));
+  const out: Saved[] = [];
+  while (queues.some((queue) => queue.length > 0)) for (const queue of queues) if (queue.length > 0) out.push(queue.shift()!);
+  return out;
+}
+
 const all: Saved[] = JSON.parse(readFileSync(`${values.corpus}/judgements.json`, "utf8"));
 const sample: Saved[] = [];
 const rules = htmlRules.filter((rule) => !(values.exclude ?? []).includes(rule.id));
@@ -52,14 +65,14 @@ for (const rule of rules) {
   const unreported = distinct.filter((j) => j.severity === null);
 
   // Round-robin over severities, so a rule with two hundred reviews and three errors still shows its errors.
-  const bySeverity = ["error", "warn", "review"].map((severity) => reported.filter((j) => j.severity === severity));
+  const bySeverity = ["error", "warn", "review"].map((severity) => acrossKinds(reported.filter((j) => j.severity === severity)));
   const takenReported: Saved[] = [];
   while (takenReported.length < Number(values.reported) && bySeverity.some((group) => group.length > 0)) {
     for (const group of bySeverity) if (group.length > 0 && takenReported.length < Number(values.reported)) takenReported.push(group.shift()!);
   }
 
-  const nearThreshold = unreported.toSorted((a, b) => b.p - a.p).slice(0, Math.ceil(Number(values.unreported) / 2));
-  const random = unreported.filter((j) => !nearThreshold.includes(j)).slice(0, Number(values.unreported) - nearThreshold.length);
+  const nearThreshold = acrossKinds(unreported.toSorted((a, b) => b.p - a.p)).slice(0, Math.ceil(Number(values.unreported) / 2));
+  const random = acrossKinds(unreported.filter((j) => !nearThreshold.includes(j))).slice(0, Number(values.unreported) - nearThreshold.length);
   sample.push(...takenReported, ...nearThreshold, ...random);
 }
 
@@ -78,15 +91,21 @@ writeFileSync(`${values.corpus}/label-sample.json`, JSON.stringify(ordered, null
 const itemsDir = `${values.corpus}/label-items`;
 rmSync(itemsDir, { recursive: true, force: true });
 mkdirSync(itemsDir, { recursive: true });
-ordered.forEach((j, n) => {
-  const item = { n, rule: j.rule, ruleDescription: description.get(j.rule), claim: CLAIMS[j.rule]?.(j) ?? j.message, hint: j.hint ?? "", snippet: j.snippet, checked: j.checked, facts: j.facts, page: j.page, kind: j.kind, band: j.band };
-  writeFileSync(`${itemsDir}/j${j.id}.json`, JSON.stringify(item));
+const items = ordered.map((j, n) => {
+  const item = { id: `j${j.id}`, n, rule: j.rule, ruleDescription: description.get(j.rule), claim: CLAIMS[j.rule]?.(j) ?? j.message, hint: j.hint ?? "", snippet: j.snippet, checked: j.checked, facts: j.facts, page: j.page, kind: j.kind, band: j.band };
+  writeFileSync(`${itemsDir}/${item.id}.json`, JSON.stringify(item));
+  return item;
 });
+// The same items in one document, for a labeller who is not running the bench. Neither form carries a
+// probability or a severity: what the tool concluded is exactly what the labels are there to check.
+const { seed } = JSON.parse(readFileSync(`${values.corpus}/manifest.json`, "utf8")) as { seed: number };
+writeFileSync(`${values.corpus}/label-sample-blind.json`, JSON.stringify({ createdFor: `seed-${seed} Tranco corpus, blind labelling round`, items }));
 
 console.table(
   rules.map((rule) => {
     const mine = ordered.filter((j) => j.rule === rule.id);
-    return { rule: rule.id, reported: mine.filter((j) => j.severity !== null).length, unreported: mine.filter((j) => j.severity === null).length };
+    const kinds = [...new Set(mine.map((j) => j.kind))].map((kind) => `${kind} ${mine.filter((j) => j.kind === kind).length}`);
+    return { rule: rule.id, reported: mine.filter((j) => j.severity !== null).length, unreported: mine.filter((j) => j.severity === null).length, kinds: kinds.join(", ") };
   }),
 );
 console.log(`${ordered.length} items`);

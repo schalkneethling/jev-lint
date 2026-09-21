@@ -1,10 +1,12 @@
 node_modules/
 .env.local
 .jev-lint-cache/
-corpus/snapshots/
-corpus/judgements.json
-corpus/label-sample.json
-corpus/label-items/
-corpus/axe-report.json
-corpus/label-sample-blind.json
-corpus/labels/
+# Every corpus keeps only its manifest in the repo. Snapshots, the axe report, judgements, and label
+# files quote other people's pages (the axe report alone is ~50 MB) and are rebuilt from the seed.
+corpus*/snapshots/
+corpus*/judgements.json
+corpus*/axe-report.json
+corpus*/label-sample.json
+corpus*/label-sample-blind.json
+corpus*/label-items/
+corpus*/labels/

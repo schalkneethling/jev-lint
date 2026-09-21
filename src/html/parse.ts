@@ -42,6 +42,7 @@ export function locOf(el: Element): Loc {
     col: loc?.startCol ?? 1,
     ...(quote && { span: { start: quote.startOffset, end: quote.endOffset } }),
     ...(axe && { axe: axe.split(" ").map(Number) }),
+    ...(isAccessibilityOverlay(el) && { widget: "accessibility overlay" as const }),
   };
 }
 
@@ -106,6 +107,18 @@ export function fieldLabel(doc: HtmlDoc, field: Element): string | undefined {
 // Consent managers are third-party widgets injected into the page. Their text is not the page's
 // content and not the author's to fix, yet on the corpus it was paired with headings and descriptions.
 const CONSENT_UI = /onetrust|cookie|consent|gdpr|usercentrics|truste|cookiebot|didomi|osano|termly/i;
+
+// Accessibility overlays are injected too, but unlike consent text their controls are part of what a
+// user meets, so their findings are kept and marked: the fix is the vendor's, or removing the overlay.
+// Each prefix here was seen on corpus pages.
+const ACCESSIBILITY_OVERLAY = /\b(uwaw-|userway|accessibly-app|acsb-)/i;
+
+function isAccessibilityOverlay(el: Element): boolean {
+  for (let node: Element | null = el; node; node = node.parentNode && "tagName" in node.parentNode ? node.parentNode : null) {
+    if (ACCESSIBILITY_OVERLAY.test(`${attr(node, "id") ?? ""} ${attr(node, "class") ?? ""}`)) return true;
+  }
+  return false;
+}
 
 export function isConsentUi(el: Element): boolean {
   for (let node: Element | null = el; node; node = node.parentNode && "tagName" in node.parentNode ? node.parentNode : null) {

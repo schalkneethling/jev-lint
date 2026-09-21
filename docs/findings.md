@@ -723,7 +723,67 @@ the time and moved no candidate; 40 words of hidden text bite 17% and moved the 
 
 A limit is a parameter with an optimum. It should be found by measuring, in both directions.
 
-## 19. Working rules for writing a Jev lint
+## 19. A second corpus, with article pages
+
+The first labels were followed by fixes scored against the same labels, which flatters them, and
+`description-matches-page` had nothing to be tested on. Seed 2 is the honest test: a fresh sample of the
+same list, fetched with the visibility stamp, and with a third kind of page.
+
+**Finding articles without reading words.** `fetch.ts --articles` looks for an article from each home
+page by structure only: the site's own feed, teaser cards (a heading link inside an `<article>`),
+headings that are links, then deep links in `main`. A page is kept when it matches what the rule itself
+requires (an `h1` inside `<article>`, or `og:type=article`) and has prose: three paragraphs of 15 words,
+200 words in all. A candidate that fails is usually the index above an article, so its teasers get one
+more hop. About one kept site in four yields an article; the run ended with 43, not the 60 asked for.
+
+| band | home | form | article |
+| --- | --- | --- | --- |
+| top 1k | 30 | 13 | 8 |
+| 1k to 100k | 30 | 14 | 17 |
+| 100k to 1m | 30 | 14 | 18 |
+
+174 pages from 128 domains. Three pages were dropped by hand after the run (two borderline topics, one
+spun content-farm page that alone produced 12% of all `link-text-purpose` reports); the re-judge came
+from the cache. On article pages `description-matches-page` has a candidate on 79% (34 of its 45
+candidates), against 9% of home pages, so the rule can now be measured.
+
+**Judging.** 49,524 judgements, 5,954 reported (12%), none unjudged; the live run cost $0.84 for 20M
+tokens in 33 minutes. One lesson from the fetcher: a step with no timeout of its own (`page.evaluate`
+around an in-page `fetch`) parked every worker behind feeds that never answered. Every wait now has a
+deadline.
+
+**What the reports show, before any labels.** No rule was changed, so the labels test what is committed.
+
+1. `aria-label-justified` reports 80% of its candidates. 1,235 of its 1,341 reviews are decided by code
+   at a fixed 0.45 with no judgement involved: 732 labels that repeat the visible text exactly (case
+   differences included) and 503 labels that do not contain it. The 129 errors and warnings, the part
+   Jev judged, are buried under them. This is a reporting-policy question, not a prompt question.
+2. `aria-hidden-hides-content` reports 68%, piled between 0.4 and 0.6. With invisible content stamped
+   out, what remains is visible duplication: the option list of a custom select, repeated marquee
+   copies, a mobile and a desktop copy of one menu or price, text inside product mock-ups. The rule
+   checks for the same words near the element, not elsewhere on the page.
+3. Third-party accessibility overlays trip several rules at once. Half of `alert-is-urgent`'s reports
+   are one overlay's toolbar buttons inside an assertive live region. Decision: keep them. Unlike consent
+   text, an overlay's controls are what a user meets, so the finding stands, but the page's author cannot
+   edit it. `locOf` now marks any element inside an overlay and the finding carries the fact
+   `third-party widget: accessibility overlay`: 53 reports on 9 pages here.
+4. `class-implies-element` still reads names with nothing in them: hashed CSS-module classes, utility
+   strings that slip past the filter when an id is present, and consent-manager markup.
+5. One widget, dozens of reports. A currency picker built from `<a href="#">` is one defect reported 34
+   times by `control-type-intent`. The engine has no notion of a repeated component within a page.
+6. Articles bring captions. 17 `alt-text-quality` reports, 15 of them errors, are "alt repeats the
+   visible caption", on two sites. Decision: an error. Alt text says what the image shows and a caption
+   adds context; they do different jobs, and the finding now says so.
+7. `heading-describes-section` reports 1% of 1,714 headings and no errors. After round one the risk has
+   moved from precision to recall. It also judged a heading that was only punctuation.
+8. A domain list is not a site list: one company appeared under three sampled domains with near-identical
+   forms, and three domains carried spun variants of one article.
+
+The blind sample is 145 items (8 reported and 5 unreported per rule where they exist), drawn round-robin
+across page kinds as well as severities so that every rule is seen on home, form, and article pages.
+`aria-hidden-hides-content` is included for the first time.
+
+## 20. Working rules for writing a Jev lint
 
 −1. Ask for the defect, not the virtue. "Is this specific enough?" has no boundary and a literal reader
    fails everything; "is this only filler?" is bounded. When one rule produces a uniform cluster of
