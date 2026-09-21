@@ -787,7 +787,57 @@ The blind sample is 145 items (8 reported and 5 unreported per rule where they e
 across page kinds as well as severities so that every rule is seen on home, form, and article pages.
 `aria-hidden-hides-content` is included for the first time.
 
-## 20. Working rules for writing a Jev lint
+## 20. The second blind labels
+
+145 items from the second corpus, labelled blind by the same person, with no rule changed between the
+first labels' fixes and this sample. This is the honest figure the first round could not give.
+
+| Rule | Precision | Precision (error + warn) | Recall (lower bound) | First round |
+| --- | --- | --- | --- | --- |
+| `alt-text-quality` | 8/8 | 6/6 | 8/11 | 8/8 |
+| `control-type-intent` | 8/8 | 6/6 | 8/12 | 8/8 |
+| `alert-is-urgent` | 6/7 | 6/7 | 6/10 | 3/3 |
+| `label-input-type` | 6/7 | 4/5 | 6/8 | 7/8 |
+| `aria-label-justified` | 5/8 | 4/6 | 5/5 | 3/8 |
+| `link-text-purpose` | 5/8 | 4/6 | 5/7 | 7/7 |
+| `autocomplete-matches-label` | 5/8 | 4/5 | 5/6 | 8/8 |
+| `description-matches-page` | 3/5 | 2/3 | 3/3 | 3/8 |
+| `class-implies-element` | 3/7 | 3/5 | 3/4 | 5/8 |
+| `aria-hidden-hides-content` | 3/8 | 2/5 | 3/4 | not labelled |
+| `heading-describes-section` | 2/8 | 0/2 | 2/4 | 3/6 |
+| `describedby-describes` | none reported | | 0/3 | not labelled |
+
+Over all rules: 54 of 82 reports were right (66%), and 41 of 56 errors and warnings (73%).
+
+**Two rules held at 8/8 on a fresh sample**, `alt-text-quality` and `control-type-intent`: both ask a
+narrow question about very few words. `aria-label-justified` improved from 3/8 to 5/8, which is what the
+rewritten question was for. Rules that were perfect on the first sample (`link-text-purpose`,
+`autocomplete-matches-label`) were not on the second: eight items is too few to call a rule perfect.
+
+**Most disagreements are facts code holds, not misjudgements.** Read one by one:
+
+- `link-text-purpose`: two of three false reports are phone numbers on `tel:` links. The destination is
+  the number; code knows the scheme.
+- `aria-label-justified`: an image link whose only "visible text" is the image's alt. The label names the
+  card on purpose. `text()` counts alt as visible text, which is right for an accessible name and wrong here.
+- `aria-hidden-hides-content`: `aria-hidden` on an `<svg>` whose `<title>` was read as hidden content; a
+  decorative HTML mock-up; text that is exposed next to the hidden copy under the same link.
+- `heading-describes-section`: four of six false reports are headings over a form or a dialog, where the
+  "content" sent was option lists and field labels ("Country* United States Canada Afghanistan…").
+- `autocomplete-matches-label`: search boxes and a disabled calculator field, neither asking for the
+  user's own data.
+- `label-input-type`: a one-time-code box ("Digit 6"). A code is not a quantity, like a postal code.
+- `describedby-describes`: all three misses are descriptions that repeat the label ("Last *" described
+  by "Last"). The rule asks whether the description is about another field; repetition is a different
+  defect, and a string comparison finds it.
+- `alert-is-urgent`: the misses are "Field is required" messages at 0.22 to 0.32. The labeller would not
+  announce them assertively; the model thinks a validation error is urgent. This one is a judgement
+  boundary, and the criteria should say which side validation messages fall on.
+
+The remaining false reports are judgement: marketing copy under a form's heading, part-of names from CSS
+modules (`Header_subtitle__x`), a meta description that fits its page.
+
+## 21. Working rules for writing a Jev lint
 
 −1. Ask for the defect, not the virtue. "Is this specific enough?" has no boundary and a literal reader
    fails everything; "is this only filler?" is bounded. When one rule produces a uniform cluster of
@@ -819,6 +869,7 @@ across page kinds as well as severities so that every rule is seen on home, form
 16. Truncate by measurement, never for thrift: first count how often a limit bites, then widen it and
     watch both recall and what gets diluted. More context can lose a finding as easily as find one.
 17. Pin the model version. Thresholds are tuned against it.
+18. Eight right out of eight is not a perfect rule. Score every fix on a sample it has not seen.
 
 ## Open questions
 
