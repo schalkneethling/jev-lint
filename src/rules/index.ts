@@ -6,7 +6,6 @@ import swallowedErrorJustified from "./code/swallowed-error-justified.ts";
 import testTitleMatchesBody from "./code/test-title-matches-body.ts";
 import alertIsUrgent from "./html/alert-is-urgent.ts";
 import altTextQuality from "./html/alt-text-quality.ts";
-import ariaHiddenHidesContent from "./html/aria-hidden-hides-content.ts";
 import ariaLabelJustified from "./html/aria-label-justified.ts";
 import autocompleteMatchesLabel from "./html/autocomplete-matches-label.ts";
 import controlTypeIntent from "./html/control-type-intent.ts";
@@ -18,7 +17,6 @@ import linkTextPurpose from "./html/link-text-purpose.ts";
 export const htmlRules: AnyRule[] = [
   alertIsUrgent,
   altTextQuality,
-  ariaHiddenHidesContent,
   ariaLabelJustified,
   autocompleteMatchesLabel,
   controlTypeIntent,

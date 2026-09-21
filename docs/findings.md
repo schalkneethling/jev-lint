@@ -866,7 +866,55 @@ rule asks about names when the answer lies in contents. A rule that cannot be ma
 noise costs the trust the other rules earn, so both are gone: ten HTML rules remain. The rule catalog
 records what a successor to the class rule would need.
 
-## 21. Working rules for writing a Jev lint
+## 21. The third blind labels, and what HTML can and cannot support
+
+47 unseen items from the second corpus, for the rules changed in §20. 20 of 29 reports were right (69%).
+
+| Rule | Precision | Over all three rounds |
+| --- | --- | --- |
+| `alert-is-urgent` | 5/5, recall 5/5 | 14/15 |
+| `autocomplete-matches-label` | 5/5 | 18/21 |
+| `link-text-purpose` | 4/5 (errors and warnings 4/4) | 16/20 |
+| `aria-label-justified` | 3/5 | 11/21 |
+| `label-input-type` | 2/5 | 15/20 |
+| `aria-hidden-hides-content` | 1/4 | 4/12 (two rounds) |
+
+The fixes that were facts held: `alert-is-urgent` and `autocomplete-matches-label` were right every time.
+The failures have one cause, and the labeller wrote it in the notes four times: "impossible to know from
+just the HTML". A tab panel is `aria-hidden` until a script shows it. A date field is `type="text"`
+because a date-picker library drives it. A ticker is hidden from screen readers on purpose.
+
+**The line is not HTML against code. It is whether the candidate contains everything the classification
+needs.** Alt text against a file name, a link's words, a label against its autocomplete token, a live
+region's message: a few words whose meaning no script changes. Those rules held at 8/8 twice, 14/15,
+18/21. A rule whose answer depends on what the page does at run time, or on what the author intended,
+cannot be rescued by wording, because the answer is not in the input.
+
+Decisions:
+
+- `aria-hidden-hides-content` is removed, with the visibility stamp that served only it. 4 of 12 over two
+  rounds, and the cause is structural.
+- `label-input-type` holds a date typed as text at review, as it does a search box: the mismatch is worth
+  a look and is very often a date picker. The `email` class now excludes a field that also accepts a
+  username ("Email / Username" went from 0.76 to 0.20).
+- `aria-label-justified` stays on probation: 11 of 21. Its code-decided cases are merged per file; the
+  part Jev classifies has to hold on its own.
+- Nine HTML rules remain, all classifications over self-contained words. They also run on JSX.
+- The effort moves to source code, where the candidate is self-contained by construction: a comment and
+  the code under it, a name and a body, a test title and its assertions. The code rules have so far met
+  only fixtures written by their author and two real files, which is exactly where the HTML rules stood
+  before the first corpus. They get the same test next: a sample of open-source repositories and blind
+  labels.
+
+**Classification, not judgement.** Jev is used here as a classification engine whose return type is a
+typed schema: a Noul is a two-class classifier with a probability, a Choice a closed set of classes with
+a distribution, a Score an ordered set of levels. Every rule that survived three rounds of labels is
+that and nothing more: closed classes, defined in the question, over input that contains the answer.
+Every rule that was removed asked for something open: is this heading apt, is this name really a nav,
+does a user need these words. The vocabulary in the code and these documents follows: rules classify,
+the engine keeps classifications, and a rule that cannot state its classes does not belong here.
+
+## 22. Working rules for writing a Jev lint
 
 −1. Ask for the defect, not the virtue. "Is this specific enough?" has no boundary and a literal reader
    fails everything; "is this only filler?" is bounded. When one rule produces a uniform cluster of
@@ -899,7 +947,9 @@ records what a successor to the class rule would need.
     watch both recall and what gets diluted. More context can lose a finding as easily as find one.
 17. Pin the model version. Thresholds are tuned against it.
 18. Eight right out of eight is not a perfect rule. Score every fix on a sample it has not seen.
-19. Check that a rule's probabilities rank its reports before tuning its threshold. If right and wrong
+19. State the classes first. A rule is a classification over what its candidate contains; if the answer
+    depends on run-time behaviour or on intent the input does not show, no wording will find it.
+20. Check that a rule's probabilities rank its reports before tuning its threshold. If right and wrong
     are interleaved at every score, remove the rule.
 
 ## Open questions

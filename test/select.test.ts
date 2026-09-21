@@ -58,19 +58,6 @@ test("link-text-purpose reports a name shared by several destinations once, with
   assert.equal(candidates[0]!.meta!.text_of_containing_element, "Adapters");
 });
 
-test("aria-hidden-hides-content skips text that is exposed nearby, referenced, or inside a labelled control", async () => {
-  const { default: rule } = await import("../src/rules/html/aria-hidden-hides-content.ts");
-  const candidates = select(
-    rule,
-    `<p><span aria-hidden="true">£240</span><span class="visually-hidden">£240</span></p>
-     <button aria-label="Close dialog"><span aria-hidden="true">Close ×</span></button>
-     <button aria-labelledby="tip">x</button><div id="tip" aria-hidden="true">Dismiss alert</div>
-     <div aria-hidden="true"><span aria-hidden="true">Only 2 left in stock</span></div>
-     <svg aria-hidden="true"></svg>`,
-  );
-  assert.deepEqual(candidates.map((c) => c.data.hidden_text), ["Only 2 left in stock"]);
-});
-
 test("alert-is-urgent skips empty live regions and unrendered template slots", async () => {
   const { default: rule } = await import("../src/rules/html/alert-is-urgent.ts");
   const candidates = select(

@@ -18,7 +18,7 @@ import { noul, TypeSafeClient } from "@typesafe-ai/sdk";
 import { chromium, type BrowserContext, type Page } from "playwright";
 import { toAxeResults, type AggregateEntry } from "../../src/axe/report.ts";
 import { MODEL } from "../../src/engine/client.ts";
-import { stampAxeTargets, stampVisibility } from "../../src/html/render.ts";
+import { stampAxeTargets } from "../../src/html/render.ts";
 
 const { values } = parseArgs({
   options: {
@@ -132,7 +132,6 @@ async function save(page: Page, entry: Omit<ManifestEntry, "file" | "url" | "tit
   const file = `${snapshots}/${String(entry.rank).padStart(7, "0")}-${entry.domain}${entry.kind === "home" ? "" : `-${entry.kind}`}.html`;
   const axe = { url: file, failed: analysis.violations, passed: analysis.passes } as unknown as AggregateEntry["axe"];
   await stampAxeTargets(page, toAxeResults(axe));
-  await stampVisibility(page);
   const html = await page.content();
   writeFileSync(file, html);
   const title = await page.title();

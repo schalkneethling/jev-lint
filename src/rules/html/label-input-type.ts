@@ -15,7 +15,7 @@ const TYPE_TO_OPTION: Record<string, Option> = {
 };
 
 const OPTIONS = {
-  email: "One email address.",
+  email: "One email address, and nothing else: a field that also accepts a username or a name is not this option.",
   tel: "A telephone number.",
   url: "A web address (URL).",
   number:
@@ -34,13 +34,17 @@ const OPTION_TO_TYPE = Object.fromEntries(Object.entries(TYPE_TO_OPTION).map(([t
 
 // A field typed search may ask for free text: the two accept the same values. The other direction was
 // argued both ways. On the corpus 109 "errors" were search boxes typed as text, which was noise at that
-// severity, so the rule stopped reporting them; then blind labelling classified type="search" to be the right
+// severity, so the rule stopped reporting them; then blind labelling found type="search" to be the right
 // type for a search box. So it is reported again, held at review by SEARCH_BOX_TYPED_AS_TEXT below.
 const matching = (type: string): Option[] => (type === "search" ? ["free_text", "search"] : [TYPE_TO_OPTION[type]!]);
 
 // A real mismatch but a cosmetic one: type="text" works as a search box in every browser. A fixed value
 // rather than a scaled one, so it cannot reach warn or error however sure Jev is.
 const SEARCH_BOX_TYPED_AS_TEXT = 0.5;
+
+// A date field typed as text is very often a script-driven date picker, which the markup does not show:
+// in the third blind round two of three false reports were exactly that. Worth a look, never an error.
+const DATE_TYPED_AS_TEXT = 0.5;
 
 export default defineRule({
   id: "label-input-type",
@@ -85,7 +89,13 @@ export default defineRule({
     // such as the boxes of a one-time code: the author has already chosen the keyboard.
     const digitsByDesign = actualType === "text" && value_kind.choice === "number" && ["numeric", "decimal"].includes(candidate.meta!.inputmode!);
     return {
-      p: digitsByDesign ? 0 : actualType === "text" && value_kind.choice === "search" ? SEARCH_BOX_TYPED_AS_TEXT : p,
+      p: digitsByDesign
+        ? 0
+        : actualType === "text" && value_kind.choice === "search"
+          ? SEARCH_BOX_TYPED_AS_TEXT
+          : actualType === "text" && value_kind.choice === "date"
+            ? Math.min(p, DATE_TYPED_AS_TEXT)
+            : p,
       message: `Field "${label}" asks for a ${value_kind.choice.replace("_", " ")} value, but the input is type="${actualType}".`,
       hint: `type="${expected}" matches what the label asks for.`,
     };

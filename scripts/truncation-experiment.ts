@@ -16,7 +16,7 @@
 //   varlock run -- node scripts/truncation-experiment.ts --limit <name> --rule <id> <dir>...
 //       Real input: how many candidates exceed each value, and how many change reported status.
 //
-//   varlock run -- node scripts/truncation-experiment.ts --limit hiddenTextWords --labels
+//   varlock run -- node scripts/truncation-experiment.ts --limit pageContentWords --labels
 //       The blind-labelled corpus classifications for the rule, re-classified at each value.
 import { existsSync, globSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { parseArgs } from "node:util";
@@ -87,7 +87,6 @@ async function facts(): Promise<void> {
 
   // Select with the limits off, so what is measured is the untruncated text each rule would send.
   const field: Record<string, { rule: string; key: string; limit: number }> = {
-    hiddenTextWords: { rule: "aria-hidden-hides-content", key: "hidden_text", limit: limits.hiddenTextWords },
     alertMessageWords: { rule: "alert-is-urgent", key: "message", limit: limits.alertMessageWords },
     fieldDescriptionWords: { rule: "describedby-describes", key: "description_announced_after_label", limit: limits.fieldDescriptionWords },
     pageContentWords: { rule: "description-matches-page", key: "start_of_page_content", limit: limits.pageContentWords },
@@ -140,7 +139,6 @@ function variantsOf(limit: LimitName): { name: string; value: number }[] {
 
 const ruleFor = (limit: LimitName): AnyRule => {
   const byLimit: Partial<Record<LimitName, string>> = {
-    hiddenTextWords: "aria-hidden-hides-content",
     alertMessageWords: "alert-is-urgent",
     fieldDescriptionWords: "describedby-describes",
     pageContentWords: "description-matches-page",

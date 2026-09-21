@@ -15,13 +15,6 @@ export const limits = {
    * 5,785) and in a real TypeScript project, and costs 4% more input tokens on this repo's own source.
    */
   codeChars: 6000,
-  /**
-   * Words of the text inside an `aria-hidden` element (`aria-hidden-hides-content`). It bites often, on 17%
-   * of 412 corpus candidates, and changes nothing: mean p moved from 0.445 to 0.453 between 40 words and no
-   * limit, and the status changes (14 in the control, 27 to 38 at wider values) are this rule's candidates
-   * sitting on the 0.4 review threshold, in both directions at once.
-   */
-  hiddenTextWords: 40,
   /** Words of a live region's message (`alert-is-urgent`). Never truncated a corpus candidate: the longest was 36 words. */
   alertMessageWords: 40,
   /** Words of the text an `aria-describedby` points at (`describedby-describes`). Never truncated a corpus candidate; the longest was 38 words. */
