@@ -6,7 +6,7 @@ export interface Item {
   candidate: Candidate;
 }
 
-/** One request: a state plus the items judged against it, each able to name its fields in that state. */
+/** One request: a state plus the items classified against it, each able to name its fields in that state. */
 export interface Batch {
   state: EntryType;
   entries: { item: Item; ref: Ref }[];
@@ -49,7 +49,7 @@ function chunk(items: Item[], maxCandidates: number): Batch[] {
 /** Splits one file's items into requests. Less isolation means fewer requests but noisier state. */
 export function toBatches(items: Item[], isolation: Isolation, maxCandidates = Infinity, stateShape: StateShape = "wrapped"): Batch[] {
   if (isolation === "candidate") {
-    // Rules that judge the same words share one request: the state is sent once and their
+    // Rules that classify the same words share one request: the state is sent once and their
     // questions are answered side by side, which is how Jev is meant to be used.
     const sameWords = Map.groupBy(items, (item) => JSON.stringify(item.candidate.data));
     const ref = refIn(stateShape === "flat" ? "" : "candidate.");

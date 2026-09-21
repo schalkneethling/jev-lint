@@ -4,7 +4,7 @@ import { parseTree } from "./parse.ts";
 
 /**
  * Stands in for anything JSX computes at run time: `{step.title}`, `aria-label={open ? "Close" : "Open"}`.
- * The engine drops every candidate whose words contain it, because judging half a label is guessing.
+ * The engine drops every candidate whose words contain it, because classifying half a label is guessing.
  */
 export const DYNAMIC = "⟨dynamic⟩";
 

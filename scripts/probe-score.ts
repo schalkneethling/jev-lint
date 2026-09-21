@@ -1,4 +1,4 @@
-// Does Score hold up? Page profiles and budgets need degrees, not verdicts. Each probe lists
+// Does Score hold up? Page profiles and budgets need degrees, not yes-or-no classes. Each probe lists
 // items from worst to best; the question is whether Jev's scores come back in that order and
 // spread across the scale rather than bunching at the ends.
 import { score, TypeSafeClient } from "@typesafe-ai/sdk";

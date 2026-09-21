@@ -34,7 +34,7 @@ const OPTION_TO_TYPE = Object.fromEntries(Object.entries(TYPE_TO_OPTION).map(([t
 
 // A field typed search may ask for free text: the two accept the same values. The other direction was
 // argued both ways. On the corpus 109 "errors" were search boxes typed as text, which was noise at that
-// severity, so the rule stopped reporting them; then blind labelling judged type="search" to be the right
+// severity, so the rule stopped reporting them; then blind labelling classified type="search" to be the right
 // type for a search box. So it is reported again, held at review by SEARCH_BOX_TYPED_AS_TEXT below.
 const matching = (type: string): Option[] => (type === "search" ? ["free_text", "search"] : [TYPE_TO_OPTION[type]!]);
 

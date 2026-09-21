@@ -105,7 +105,7 @@ test("autocomplete-matches-label reads the purpose token, keeps it from the mode
   assert.ok(candidates.every((c) => !("autocomplete" in c.data)));
 });
 
-test("description-matches-page judges article pages only, one candidate each, and none for an empty description", async () => {
+test("description-matches-page classifies article pages only, one candidate each, and none for an empty description", async () => {
   const { default: rule } = await import("../src/rules/html/description-matches-page.ts");
   const body = `<main><article><h1>Pricing</h1><p>${Array.from({ length: 20 }, () => "word").join(" ")}</p></article></main>`;
   const page = (description: string) => `<title>Pricing | Acme</title><meta name="description" content="${description}">${body}`;

@@ -149,21 +149,21 @@ const SCRIPT = `<script>
 export interface HtmlOptions {
   /** What was linted, as given on the command line. */
   targets: string[];
-  /** How many candidates each rule judged, reported or not. A short report should still show what was examined. */
-  judged: Map<string, number>;
+  /** How many candidates each rule classified, reported or not. A short report should still show what was examined. */
+  classified: Map<string, number>;
   withAxe: boolean;
   /** A complete document. When false, only the page content, for hosts that supply their own shell. */
   standalone?: boolean;
 }
 
-export function html(findings: Finding[], stats: RunStats, { targets, judged, withAxe, standalone = true }: HtmlOptions): string {
+export function html(findings: Finding[], stats: RunStats, { targets, classified, withAxe, standalone = true }: HtmlOptions): string {
   const elements = byElement(findings);
   const count = (severity: Severity) => findings.filter((f) => f.severity === severity).length;
   const vbf = findings.filter(isValidButFalse).length;
   const cost = (stats.inputTokens / 1_000_000) * USD_PER_MILLION_TOKENS;
   const subject = targets.length === 1 ? targets[0]! : /^https?:/.test(targets[0] ?? "") ? new URL(targets[0]!).hostname : `${targets.length} targets`;
   const reported = Map.groupBy(findings, (f) => f.ruleId);
-  const byRule = [...judged].map(([rule, total]) => [rule, reported.get(rule) ?? [], total] as const).sort((a, b) => b[1].length - a[1].length || b[2] - a[2]);
+  const byRule = [...classified].map(([rule, total]) => [rule, reported.get(rule) ?? [], total] as const).sort((a, b) => b[1].length - a[1].length || b[2] - a[2]);
 
   const stat = (kind: string, value: number | string, label: string) => `<div class="stat stat-${kind}"><b>${value}</b><span>${label}</span></div>`;
 
@@ -171,7 +171,7 @@ export function html(findings: Finding[], stats: RunStats, { targets, judged, wi
 <header>
   <p class="eyebrow">jev-lint meaning report</p>
   <h1>${esc(subject)}</h1>
-  <p class="lede">Each finding is a judgement about what the words mean, not whether the markup or code is valid. It lists what Jev measured, what code established${withAxe ? ", and what axe concluded about the same element" : ""}, so you can act on it without repeating the judgement.</p>
+  <p class="lede">Each finding is a classification about what the words mean, not whether the markup or code is valid. It lists what Jev measured, what code established${withAxe ? ", and what axe concluded about the same element" : ""}, so you can act on it without repeating the classification.</p>
 </header>
 
 <section class="summary" aria-label="Summary">

@@ -4,7 +4,7 @@ import { byElement } from "./group.ts";
 /**
  * For coding agents and CI. Each element lists its findings with the words checked, Jev's
  * measurements, and the facts code established, which is what an agent needs to act without
- * repeating the judgement.
+ * repeating the classification.
  */
 export function json(findings: Finding[], stats: RunStats): string {
   const elements = byElement(findings).map(({ file, loc, snippet, findings: group }) => ({

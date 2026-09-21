@@ -1,4 +1,4 @@
-// How many candidates can share one state before judgements drift from the isolated baseline?
+// How many candidates can share one state before classifications drift from the isolated baseline?
 // Usage: varlock run -- node scripts/chunk-experiment.ts <file.html> <rule-id>
 import { readFileSync } from "node:fs";
 import { AnswerCache } from "../src/engine/cache.ts";
@@ -15,17 +15,17 @@ const cache = new AnswerCache(".jev-lint-cache");
 const baseline = await run(files, { rules, ask, cache, isolation: "candidate" });
 const rows = [];
 for (const maxCandidates of [2, 4, 8, 16, 32, 64, Infinity]) {
-  const { judgements, stats } = await run(files, { rules, ask, cache, isolation: "rule", maxCandidates });
-  const drift = judgements.map((j, i) => Math.abs(j.p - baseline.judgements[i]!.p));
-  const flips = judgements.filter((j, i) => (j.severity === null) !== (baseline.judgements[i]!.severity === null)).length;
+  const { classifications, stats } = await run(files, { rules, ask, cache, isolation: "rule", maxCandidates });
+  const drift = classifications.map((j, i) => Math.abs(j.p - baseline.classifications[i]!.p));
+  const flips = classifications.filter((j, i) => (j.severity === null) !== (baseline.classifications[i]!.severity === null)).length;
   rows.push({
     "candidates per state": maxCandidates,
     requests: stats.requests,
     "input tokens": stats.inputTokens,
     "mean |Δp|": (drift.reduce((a, b) => a + b, 0) / drift.length).toFixed(3),
     "max |Δp|": Math.max(...drift).toFixed(2),
-    "reported/not flips": `${flips}/${judgements.length}`,
+    "reported/not flips": `${flips}/${classifications.length}`,
   });
 }
-console.log(`baseline: ${baseline.judgements.length} candidates, ${baseline.stats.requests} requests, ${baseline.stats.inputTokens} tokens (cached answers cost 0)`);
+console.log(`baseline: ${baseline.classifications.length} candidates, ${baseline.stats.requests} requests, ${baseline.stats.inputTokens} tokens (cached answers cost 0)`);
 console.table(rows);

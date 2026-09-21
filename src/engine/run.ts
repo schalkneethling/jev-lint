@@ -12,7 +12,7 @@ import {
   type Assessment,
   type Finding,
   type Isolation,
-  type Judgement,
+  type Classification,
   type RuleQuestions,
   type RunStats,
   type StateShape,
@@ -27,7 +27,7 @@ export interface RunOptions {
   /** `candidate` isolation only: whether the candidate's fields are named directly or nested under `candidate`. */
   stateShape?: StateShape;
   /**
-   * Never call the model: answer from the cache, and leave unjudged whatever the cache cannot answer.
+   * Never call the model: answer from the cache, and leave unclassified whatever the cache cannot answer.
    * For re-reading results after a change to code or policy, and for runs with no credentials at hand.
    */
   cacheOnly?: boolean;
@@ -43,7 +43,7 @@ export interface SourceFile {
 }
 
 export interface RunResult {
-  judgements: Judgement[];
+  classifications: Classification[];
   findings: Finding[];
   stats: RunStats;
 }
@@ -69,7 +69,7 @@ function measurementOf(answer: ResultFor<Question>): Finding["measurements"][str
   return { choice: answer.choice, probability: answer.probabilities[answer.choice]! };
 }
 
-function toFinding(j: Judgement, severity: Finding["severity"], { source, axe }: SourceFile): Finding {
+function toFinding(j: Classification, severity: Finding["severity"], { source, axe }: SourceFile): Finding {
   const { span } = j.candidate.loc;
   const quoted = span && source.slice(span.start, span.end).replace(/ data-jev-(axe|not-visible)="[^"]*"/g, "").replace(/\s+/g, " ");
   const onElement = axe && (j.candidate.loc.axe ?? []).map((index) => axe[index]!);
@@ -94,7 +94,7 @@ function toFinding(j: Judgement, severity: Finding["severity"], { source, axe }:
 
 /**
  * A page that repeats its visible text in two hundred aria-labels has one habit, not two hundred defects.
- * Judgements stay per element; only the report merges them, at the first place the pattern occurs.
+ * Classifications stay per element; only the report merges them, at the first place the pattern occurs.
  */
 export function mergePatterns(findings: Finding[]): Finding[] {
   const groups = Map.groupBy(findings, (f) => (f.pattern === undefined ? Symbol() : `${f.file}\0${f.ruleId}\0${f.severity}\0${f.pattern}`));
@@ -138,7 +138,7 @@ export async function run(files: SourceFile[], options: RunOptions): Promise<Run
     return keys.map((key) => answers.get(key));
   }
 
-  async function judge(file: string, batch: Batch): Promise<Judgement[]> {
+  async function classify(file: string, batch: Batch): Promise<Classification[]> {
     // A rule leaves out the questions it would ignore for this candidate, so the set varies per entry.
     const perEntry = batch.entries.map((entry) =>
       Object.entries(entry.item.rule.questions(entry.ref, entry.item.candidate) as RuleQuestions).filter(
@@ -160,14 +160,14 @@ export async function run(files: SourceFile[], options: RunOptions): Promise<Run
     let next = 0;
     return batch.entries.flatMap(({ item }, i) => {
       const named = perEntry[i]!.map(([name]) => [name, flat[next++]] as const);
-      // Only in cache-only mode: a candidate missing any answer is left out, never judged on a guess.
+      // Only in cache-only mode: a candidate missing any answer is left out, never classified on a guess.
       if (named.some(([, answer]) => answer === undefined)) return (stats.unanswered++, []);
-      const answers = Object.fromEntries(named) as Judgement["answers"];
-      return [toJudgement(file, item, item.rule.assess(answers, item.candidate), answers)];
+      const answers = Object.fromEntries(named) as Classification["answers"];
+      return [toClassification(file, item, item.rule.assess(answers, item.candidate), answers)];
     });
   }
 
-  function toJudgement(file: string, item: Item, assessment: Assessment, answers: Judgement["answers"]): Judgement {
+  function toClassification(file: string, item: Item, assessment: Assessment, answers: Classification["answers"]): Classification {
     return {
       ...assessment,
       ruleId: item.rule.id,
@@ -178,10 +178,10 @@ export async function run(files: SourceFile[], options: RunOptions): Promise<Run
     };
   }
 
-  const decided: Judgement[] = [];
+  const decided: Classification[] = [];
   const perFile = await Promise.all(
     files.map(async (file) => {
-      // A JS or TS file is read twice: as code, and for the markup in its JSX, which the HTML rules judge.
+      // A JS or TS file is read twice: as code, and for the markup in its JSX, which the HTML rules classify.
       const docs = isCodeFile(file.path)
         ? ([["code", await parseCode(file.path, file.source)], ["html", await parseJsx(file.path, file.source)]] as const)
         : ([["html", parseHtml(file.path, file.source)]] as const);
@@ -189,22 +189,22 @@ export async function run(files: SourceFile[], options: RunOptions): Promise<Run
         rules
           .filter((rule) => rule.target === target)
           .flatMap((rule) => rule.select(doc).map((candidate) => ({ rule, candidate })))
-          // Words computed at run time cannot be judged from source; half a label would be a guess.
+          // Words computed at run time cannot be classified from source; half a label would be a guess.
           .filter(({ candidate }) => !JSON.stringify(candidate.data).includes(DYNAMIC)),
       );
       // Candidates that code already decided are reported directly and never reach the model.
-      for (const item of items) if (item.candidate.decided) decided.push(toJudgement(file.path, item, item.candidate.decided, {}));
+      for (const item of items) if (item.candidate.decided) decided.push(toClassification(file.path, item, item.candidate.decided, {}));
       return toBatches(items.filter((item) => !item.candidate.decided), isolation, maxCandidates, stateShape).map(
-        (batch) => () => judge(file.path, batch),
+        (batch) => () => classify(file.path, batch),
       );
     }),
   );
   const tasks = perFile.flat();
 
-  const judgements = [...decided, ...(await pool(tasks, concurrency)).flat()];
+  const classifications = [...decided, ...(await pool(tasks, concurrency)).flat()];
   const sources = new Map(files.map((file) => [file.path, file]));
-  const findings: Finding[] = mergePatterns(judgements.flatMap((j) => (j.severity === null ? [] : [toFinding(j, j.severity, sources.get(j.file)!)])))
+  const findings: Finding[] = mergePatterns(classifications.flatMap((j) => (j.severity === null ? [] : [toFinding(j, j.severity, sources.get(j.file)!)])))
     .sort((a, b) => a.file.localeCompare(b.file) || a.loc.line - b.loc.line || a.loc.col - b.loc.col);
 
-  return { judgements, findings, stats };
+  return { classifications, findings, stats };
 }

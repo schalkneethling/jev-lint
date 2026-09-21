@@ -10,7 +10,7 @@ import { parseArgs } from "node:util";
 import { readAxeReport, type AxeResult } from "../src/axe/report.ts";
 import { createAsk } from "../src/engine/client.ts";
 import { run, type SourceFile } from "../src/engine/run.ts";
-import type { AnyRule, Judgement, RuleQuestions } from "../src/engine/types.ts";
+import type { AnyRule, Classification, RuleQuestions } from "../src/engine/types.ts";
 import { allRules } from "../src/rules/index.ts";
 
 const { values, positionals } = parseArgs({
@@ -45,10 +45,10 @@ async function fixtures(rule: AnyRule) {
       // No cache, so every variant pays for and reports its own tokens.
       const result = await run(read(`fixtures/${rule.target}/${rule.id}/${label}`), { rules: [rule], ask, isolation: "candidate" });
       tokens += result.stats.inputTokens;
-      return result.judgements;
+      return result.classifications;
     }),
   );
-  const flagged = (js: Judgement[]) => js.filter((j) => j.severity !== null).length;
+  const flagged = (js: Classification[]) => js.filter((j) => j.severity !== null).length;
   return {
     recall: `${flagged(bad!)}/${bad!.length}`,
     "false +": `${flagged(good!)}/${good!.length}`,
@@ -85,14 +85,14 @@ async function onRealInput(): Promise<void> {
   const kept = await run(files, { rules, ask, isolation: "candidate" });
   const control = await run(files, { rules, ask, isolation: "candidate" });
   const stripped = await run(files, { rules: rules.map((rule) => without(rule, values.without)), ask, isolation: "candidate" });
-  const flips = (other: Judgement[]) => kept.judgements.filter((j, i) => (j.severity === null) !== (other[i]!.severity === null));
+  const flips = (other: Classification[]) => kept.classifications.filter((j, i) => (j.severity === null) !== (other[i]!.severity === null));
   console.table([
-    { variant: "criteria kept", reported: kept.judgements.filter((j) => j.severity).length, flips: "", tokens: kept.stats.inputTokens },
-    { variant: "kept again (control)", reported: control.judgements.filter((j) => j.severity).length, flips: flips(control.judgements).length, tokens: control.stats.inputTokens },
-    { variant: values.without ? `without ${values.without.join(", ")}` : "no Noul criteria", reported: stripped.judgements.filter((j) => j.severity).length, flips: flips(stripped.judgements).length, tokens: stripped.stats.inputTokens },
+    { variant: "criteria kept", reported: kept.classifications.filter((j) => j.severity).length, flips: "", tokens: kept.stats.inputTokens },
+    { variant: "kept again (control)", reported: control.classifications.filter((j) => j.severity).length, flips: flips(control.classifications).length, tokens: control.stats.inputTokens },
+    { variant: values.without ? `without ${values.without.join(", ")}` : "no Noul criteria", reported: stripped.classifications.filter((j) => j.severity).length, flips: flips(stripped.classifications).length, tokens: stripped.stats.inputTokens },
   ]);
-  for (const j of flips(stripped.judgements)) {
-    const after = stripped.judgements[kept.judgements.indexOf(j)]!;
+  for (const j of flips(stripped.classifications)) {
+    const after = stripped.classifications[kept.classifications.indexOf(j)]!;
     console.log(`${j.severity === null ? "NEW    " : "DROPPED"} ${j.ruleId} ${j.p.toFixed(2)} -> ${after.p.toFixed(2)}  ${JSON.stringify(j.candidate.data).slice(0, 150)}`);
   }
 }

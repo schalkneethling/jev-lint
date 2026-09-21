@@ -90,7 +90,7 @@ test("comment rules skip tool directives and API docs", async () => {
   assert.deepEqual(commentCandidates(doc).map((c) => c.data.code), ["posts.sort(byDate);"]);
 });
 
-test("rules that judge the same words share one request", async () => {
+test("rules that classify the same words share one request", async () => {
   const seen: string[][] = [];
   const ask: Ask = async (_state, questions) => {
     seen.push(Object.keys(questions));
@@ -99,14 +99,14 @@ test("rules that judge the same words share one request", async () => {
       usage: { input_tokens: 1, output_tokens: 1 },
     };
   };
-  const { judgements } = await run([{ path: "sample.ts", source }], {
+  const { classifications } = await run([{ path: "sample.ts", source }], {
     rules: [commentDescribesCode, commentGivesReason],
     ask,
     isolation: "candidate",
   });
   assert.equal(seen.length, 1);
   assert.equal(seen[0]!.length, 3);
-  assert.deepEqual(judgements.map((j) => Object.keys(j.answers)), [["describes_behaviour", "accurate"], ["only_restates"]]);
+  assert.deepEqual(classifications.map((j) => Object.keys(j.answers)), [["describes_behaviour", "accurate"], ["only_restates"]]);
 });
 
 test("an empty catch is found with the comment inside it; a catch that does something is not", async () => {

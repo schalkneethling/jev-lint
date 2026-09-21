@@ -33,7 +33,7 @@ export default defineRule({
     doc.elements
       .filter((el) => FIELDS.includes(el.tagName) && attr(el, "aria-describedby"))
       .map((el) => {
-        // Ids that resolve to nothing are an ARIA validity error, which axe reports. Only what resolves is judged.
+        // Ids that resolve to nothing are an ARIA validity error, which axe reports. Only what resolves is classified.
         const targets = attr(el, "aria-describedby")!.split(/\s+/).map((id) => byId(doc, id)).filter((target) => target !== undefined);
         return { el, label: fieldLabel(doc, el), description: targets.map((target) => text(target)).join(" ").trim() };
       })
@@ -59,7 +59,7 @@ export default defineRule({
   questions: (ref) => ({
     label_asks_for: choice(`${ref("field_label")} is the label of one field in a web form. What kind of value does the label ask for?`, KINDS),
     description_is_for: choice(
-      `${ref("description_announced_after_label")} is help text in a web form. Judging the help text by itself, what kind of field was it written for?`,
+      `${ref("description_announced_after_label")} is help text in a web form. Classifying the help text by itself, what kind of field was it written for?`,
       {
         ...KINDS,
         any_field: "It could sit under any field: that the field is required or optional, how the data is used, or a privacy note.",

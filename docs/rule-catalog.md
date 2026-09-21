@@ -6,7 +6,7 @@ its place only where a deterministic linter cannot decide, because the answer de
 Every rule has the same shape:
 
 1. **Code extracts** a small candidate with a parser and gives it named fields.
-2. **Jev judges** one narrow thing about it: a Noul (does a condition hold), a Choice (which one of a closed
+2. **Jev classifies** one narrow thing about it: a Noul (does a condition hold), a Choice (which one of a closed
    set), or a Score (where on an ordered scale).
 3. **Code decides**: compares with facts it withheld, applies thresholds, reports `file:line:col`.
 
@@ -17,7 +17,7 @@ Risk refers to [Jev 1.13 jaggedness](https://docs.typesafe.ai/model-jaggedness/j
 
 ## HTML
 
-| Rule | Catches | Code extracts | Jev judges | Code decides | Status |
+| Rule | Catches | Code extracts | Jev classifies | Code decides | Status |
 | --- | --- | --- | --- | --- | --- |
 | `alt-text-quality` | alt that is a file name, a placeholder, announces "image of", or repeats the caption | alt, file name, figcaption; the "image of" opening is a regex, decided in code | two Nouls: `is_placeholder`; `repeats_caption`, asked only of an image that has one | p = the larger of the two | built |
 | `link-text-purpose` | "click here", "more", bare timestamps; raw URLs decided in code | accessible name and the heading above the link; `href` withheld | two Nouls: is the text only filler; is it an item of the kind the heading announces | p = filler × (1 − item under heading) | built |
@@ -30,7 +30,7 @@ Risk refers to [Jev 1.13 jaggedness](https://docs.typesafe.ai/model-jaggedness/j
 | `button-text-is-action` | buttons labelled "OK", "Yes", "Here" | button text | Noul: does the text name the action | low p reports | idea |
 | `placeholder-as-label` | placeholder carries the only instruction for a field | placeholder, label presence (code) | Noul: is this placeholder an instruction or label rather than an example value | only when code finds no label | idea |
 | `lang-mismatch` | `lang="en"` on German content | text sample; `lang` withheld | Choice over a closed language list | compare with `lang` | idea; risk: English is the primary training language |
-| `error-text-actionable` | inline validation text that blames or says nothing | text of `[role=alert]`, `.error`, `aria-describedby` targets | Noul | low p reports | idea; same judgement was probed for JS strings |
+| `error-text-actionable` | inline validation text that blames or says nothing | text of `[role=alert]`, `.error`, `aria-describedby` targets | Noul | low p reports | idea; same classification was probed for JS strings |
 
 ### Removed after two rounds of blind labels
 
@@ -41,7 +41,7 @@ the bar" fits the copy under it is taste, and a linter should not report taste. 
 belong to other checks.
 
 `class-implies-element` was right on 8 of 15, again with no separation (false at 0.99, true at 0.45). It
-judged names alone, but whether a `<div>` should be a `<nav>` depends on what it contains and what it does
+classified names alone, but whether a `<div>` should be a `<nav>` depends on what it contains and what it does
 on the page. A successor would describe the element's contents (links only? one control? repeated on
 every page?) and ask what that is, with the name as one field among several. It was also the costliest
 rule: about 19,000 candidates per corpus.
@@ -56,7 +56,7 @@ it: ARIA overrides what assistive technology announces, so a wrong value is wors
 In every rule below, code resolves the references first (`aria-labelledby` and `aria-describedby` ids, text
 content, the element's role) and Jev sees only the resolved strings.
 
-| Rule | Catches | Code extracts | Jev judges | Status |
+| Rule | Catches | Code extracts | Jev classifies | Status |
 | --- | --- | --- | --- | --- |
 | `aria-label-justified` | an `aria-label` on a control that already has visible text, where it is not needed or does not help | visible text, aria-label, how many controls on the page share that visible text | see below | built |
 | `aria-label-usable` | `aria-label="button"`, `"icon"`, `"click"`, a class name | aria-label | Noul: does it name an action or destination | probed 5/5 |
@@ -73,7 +73,7 @@ steps, and only the last two involve Jev:
 1. **Code.** The `aria-label` must contain the visible text (WCAG 2.5.3, label in name), or voice control
    users cannot activate the control by saying what they see. String containment; report as an error.
 2. **Is an override justified?** Only when the visible text is ambiguous. Code counts controls sharing the
-   same visible text. If it is unique, the `link-text-purpose` judgement decides whether it is generic. Unique
+   same visible text. If it is unique, the `link-text-purpose` classification decides whether it is generic. Unique
    and specific visible text means the `aria-label` should be removed.
 3. **Does it disambiguate?** Noul: does the `aria-label` add the specific subject the visible text leaves
    out. "Read more about the Postgres migration" scores 0.97; "Read more link" scores 0.04.
@@ -89,7 +89,7 @@ integrity, `tabindex` order, focus management, and anything that only exists aft
 Parser: postcss. Convert numeric representations to words in code before asking. Jev is weak on hex colours
 and on comparing numbers, so send `blue`, not `#00f`, and never ask it which of two lengths is larger.
 
-| Rule | Catches | Code extracts | Jev judges | Code decides | Status |
+| Rule | Catches | Code extracts | Jev classifies | Code decides | Status |
 | --- | --- | --- | --- | --- | --- |
 | `class-name-matches-declarations` | `.text-red { color: blue }`, `.is-visible { display: none }` | selector, declarations with colours named | Noul: do the declarations do what the name promises | low p reports; only for utility-like single-class selectors | probed 6/6 |
 | `visually-hidden-is-accessible` | `.sr-only { display: none }`, which hides content from screen readers too | selector matched by name in code, declarations | Noul | low p reports | probed 3/3; a deterministic check for `display: none` does most of this |
@@ -105,7 +105,7 @@ Parser: tree-sitter, one query file for JS, TS, and TSX. Keep candidates to one 
 A whole module is too much state, and anything needing data flow across functions needs more hops than Jev
 handles well.
 
-| Rule | Catches | Code extracts | Jev judges | Code decides | Status |
+| Rule | Catches | Code extracts | Jev classifies | Code decides | Status |
 | --- | --- | --- | --- | --- | --- |
 | `function-name-matches-body` | `getUser` that deletes, `isValid` that sends email | name, body (truncated) | Noul: would a caller who read only the name be surprised by a side effect | low p reports | built |
 | `comment-describes-code` | stale comments | comment and the statement below it; directives, API docs, and file headers skipped in code | two Nouls: does the comment describe an operation; does the code do it | p = describes × (1 − accurate) | built |
@@ -139,5 +139,5 @@ handles well.
 | Unused variables, unreachable code, type errors | exact analysis already exists | ESLint, TypeScript |
 | Data flow across functions or files | multi-hop indirection | static analysis, or a reasoning model on escalation |
 | Writing the fix: better alt text, a better name | generation | pass `review` findings to a generative model |
-| Judging a whole file in one request | large state loses accuracy; see findings §1 | one candidate per request |
+| Classifying a whole file in one request | large state loses accuracy; see findings §1 | one candidate per request |
 | Linting untrusted third-party markup as a gate | state can steer the answer | treat results as advisory |

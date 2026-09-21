@@ -18,7 +18,7 @@ HTML (ten rules) and JavaScript/TypeScript (five rules) are implemented. CSS is 
 - [Design doc](https://claude.ai/code/artifact/063b1959-d80e-4620-916a-7c822cebfcb2): what is novel here, the question families, and the decisions taken.
 
 It is for developers and coding agents, run from a command or in CI. A finding therefore carries what
-was checked and why it was reported, so the reader can act without repeating the judgement. Fixing is out of scope.
+was checked and why it was reported, so the reader can act without repeating the classification. Fixing is out of scope.
 
 ```
   10:43    <a href="/blog/1" aria-label="Read more link">Read more</a>
@@ -43,12 +43,12 @@ file → parser → rule.select()    small candidates with source locations; cod
 
 Parsers do as much as they can. HTML goes through parse5, from a file or from a page rendered by Playwright.
 JSX in a JS or TS file is read into the same element shape, so every HTML rule also runs on React source and
-reports `file:line`; anything computed at run time is marked and never judged.
+reports `file:line`; anything computed at run time is marked and never classified.
 With `--axe`, each finding also says what axe concluded about the same element; when axe passed the form
 of something whose meaning fails, the finding is marked **valid but false**. JS and TS go through tree-sitter, where a
 language is a grammar plus one query file (`src/code/queries/javascript.scm`); rules read functions,
 comments, and tests, never a syntax tree, so another language needs no new rules. Jev is asked only what
-is left, and rules that judge the same words share one request.
+is left, and rules that classify the same words share one request.
 
 A rule is one file in `src/rules/html/` or `src/rules/code/`. The contract is in `src/engine/types.ts`.
 

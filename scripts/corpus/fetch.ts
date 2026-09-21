@@ -5,7 +5,7 @@
 //
 // Per site: the home page; one form page found by following a contact, sign-in, sign-up, or checkout
 // link, because home pages rarely contain the forms several rules are about; and one article page, because
-// the first corpus had none and `description-matches-page` now judges nothing else. axe runs in the same
+// the first corpus had none and `description-matches-page` now classifies nothing else. axe runs in the same
 // visit and its results are stamped onto the elements before the DOM is saved, so snapshots join to axe exactly.
 //
 // The repo keeps the manifest. Snapshots and the axe report quote other people's pages: they stay in
@@ -53,12 +53,12 @@ const FORM_LINK = /contact|log-?in|sign-?in|sign-?up|register|join|checkout|subs
 const ARTICLE_CANDIDATES = 3;
 const ARTICLE_LOADS = 3;
 // What "a substantial amount of prose" means: enough paragraphs, and enough words in them, that a
-// description or a heading has something to be judged against. A listing page fails both.
+// description or a heading has something to be classified against. A listing page fails both.
 const ARTICLE_PARAGRAPHS = 3;
 const ARTICLE_WORDS = 200;
 // A random sample of the web includes sites nobody should have to label. A keyword list was tried first
 // and let an adult site through whose title was slang in another language: what a site is about is a
-// judgement about meaning, so Jev makes it, from the same few words a person would glance at.
+// classification about meaning, so Jev makes it, from the same few words a person would glance at.
 const UNSUITABLE_ABOVE = 0.3;
 const jev = new TypeSafeClient({ defaultModel: MODEL });
 
@@ -140,7 +140,7 @@ async function save(page: Page, entry: Omit<ManifestEntry, "file" | "url" | "tit
   axeReport.push({ testId: file, title, status: analysis.violations.length > 0 ? "failed" : "passed", axe });
 }
 
-/** Whether the page in front of us is one a person can read and that is worth judging. */
+/** Whether the page in front of us is one a person can read and that is worth classifying. */
 async function suitable(page: Page, domain: string): Promise<string | true> {
   const facts = await page.evaluate(() => {
     const words = (document.body?.innerText ?? "").split(/\s+/).filter(Boolean);
@@ -173,7 +173,7 @@ async function formPage(page: Page): Promise<string | undefined> {
 /**
  * Links off the home page that structurally promise an article. The DOM already says which links are
  * titles of pieces — a teaser card, a heading that is a link — so nothing here reads the wording, which is
- * what let a keyword list misjudge a site's language in the suitability check. Best-first: one candidate
+ * what let a keyword list misclassify a site's language in the suitability check. Best-first: one candidate
  * that checks out is all a site contributes.
  */
 async function articleLinks(page: Page): Promise<string[]> {
@@ -235,7 +235,7 @@ async function feedLinks(page: Page): Promise<string[]> {
 
 /**
  * Whether the page loaded really is an article: the same test `description-matches-page` applies, plus
- * enough prose for that rule to have something to judge. A section index
+ * enough prose for that rule to have something to classify. A section index
  * satisfies neither, and a teaser link often leads to one.
  */
 async function isArticlePage(page: Page): Promise<boolean> {
@@ -277,8 +277,8 @@ async function visit(context: BrowserContext, domain: string, rank: number, band
   const page = await context.newPage();
   try {
     if (!(await load(page, `https://${domain}/`))) return skip("error status"), false;
-    const verdict = await suitable(page, domain);
-    if (verdict !== true) return skip(verdict), false;
+    const suitability = await suitable(page, domain);
+    if (suitability !== true) return skip(suitability), false;
     // Both extra pages are chosen here, while the home page is still the one loaded.
     const formUrl = quota.want("form") ? await formPage(page) : undefined;
     // The feed goes first: its entries are articles by definition, where a link only looks like one.

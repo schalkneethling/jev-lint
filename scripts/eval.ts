@@ -5,7 +5,7 @@ import { parseArgs } from "node:util";
 import { AnswerCache } from "../src/engine/cache.ts";
 import { createAsk } from "../src/engine/client.ts";
 import { run } from "../src/engine/run.ts";
-import type { Isolation, Judgement } from "../src/engine/types.ts";
+import type { Isolation, Classification } from "../src/engine/types.ts";
 import { allRules } from "../src/rules/index.ts";
 
 const { values } = parseArgs({ options: { isolation: { type: "string", multiple: true } } });
@@ -14,7 +14,7 @@ const isolations = (values.isolation ?? ["candidate", "rule", "file"]) as Isolat
 const ask = createAsk();
 const cache = new AnswerCache(".jev-lint-cache");
 const read = (dir: string) => globSync(`${dir}/**/*.{html,ts,js}`).sort().map((path) => ({ path, source: readFileSync(path, "utf8") }));
-const mean = (js: Judgement[]) => (js.reduce((sum, j) => sum + j.p, 0) / (js.length || 1)).toFixed(2);
+const mean = (js: Classification[]) => (js.reduce((sum, j) => sum + j.p, 0) / (js.length || 1)).toFixed(2);
 
 const rows: Record<string, string | number>[] = [];
 const misses: string[] = [];
@@ -30,10 +30,10 @@ for (const isolation of isolations) {
       ["bad", "good"].map(async (label) => {
         const result = await run(read(`${dir}/${label}`), { rules: active, ask, isolation, cache });
         tokens += result.stats.inputTokens;
-        return result.judgements.filter((j) => j.ruleId === rule.id);
+        return result.classifications.filter((j) => j.ruleId === rule.id);
       }),
     );
-    const flagged = (j: Judgement) => j.severity !== null;
+    const flagged = (j: Classification) => j.severity !== null;
     const tp = bad!.filter(flagged).length;
     const fp = good!.filter(flagged).length;
     rows.push({

@@ -10,7 +10,7 @@ const isControl = (el: Element) =>
 const normalize = (value: string) => value.toLowerCase().replace(/\s+/g, " ").trim();
 
 // Which of the two texts contains the other is string containment after one declared normalisation, so
-// code decides it. What to make of each case is policy, and one of the four needs a judgement.
+// code decides it. What to make of each case is policy, and one of the four needs a classification.
 type Relation = "same" | "label_extends_text" | "label_is_part_of_text" | "unrelated_wording";
 
 function relate(label: string, visible: string): Relation {

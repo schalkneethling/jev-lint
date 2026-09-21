@@ -6,7 +6,7 @@ Spike run on 2026-09-19 against `jev-1.13.0`. All numbers come from `pnpm eval`,
 ## Summary
 
 Semantic linting with Jev works, and it is cheap enough to run on every commit. The shape that works is
-narrow: **code extracts one small candidate, Jev makes one judgement about it, code decides what to report.**
+narrow: **code extracts one small candidate, Jev makes one classification about it, code decides what to report.**
 The one serious trap is batching many candidates into a single state.
 
 ## 1. Isolate every candidate
@@ -115,8 +115,8 @@ a spec lookup that axe and html-validate already do exactly.
 The first version of the probe asked whether an `aria-label` agrees with the visible text. That framing was
 wrong twice over. An `aria-label` on a control with visible text is only justified when it disambiguates
 otherwise identical controls, and whether the label contains the visible text (WCAG 2.5.3) is string
-containment, not a judgement. The rule became `aria-label-justified`: two checks in code, the existing
-`link-text-purpose` judgement, and one new question (does the label add the specific subject), which scored
+containment, not a classification. The rule became `aria-label-justified`: two checks in code, the existing
+`link-text-purpose` classification, and one new question (does the label add the specific subject), which scored
 8/8 with every answer at or beyond 0.05 and 0.97.
 
 The general lesson: before writing a question, ask which parts of it are a lookup or a string comparison.
@@ -138,7 +138,7 @@ the ARIA section of the [rule catalog](rule-catalog.md).
 
 ## 6. Run-to-run variance
 
-Asking the identical question three times without the cache gave p = 0.70, 0.73, and 0.71. Judgements near a
+Asking the identical question three times without the cache gave p = 0.70, 0.73, and 0.71. Classifications near a
 threshold can change severity between cold runs. The answer cache makes a repeated run stable. Thresholds
 should sit in the gap between the good and bad distributions, not at the edge of either.
 
@@ -221,7 +221,7 @@ Two lessons go beyond these rules.
 
 **Atomic also means independent.** The first gating question was "does the comment state what *this code*
 does?". For a stale comment the literal answer is no, so the gate closed on exactly the comments the rule
-exists to catch, and recall fell from 6/6 to 0/6. Rephrased about the comment alone ("judge the comment by
+exists to catch, and recall fell from 6/6 to 0/6. Rephrased about the comment alone ("classify the comment by
 itself and ignore any code"), recall returned. A question that mentions another question's subject can
 collapse into it.
 
@@ -288,7 +288,7 @@ invisible to any linter.
 | Change | Before | After |
 | --- | --- | --- |
 | **Ask for the defect, not the virtue.** "Does this text name the specific page, resource, or action?" became "Is this text made up only of filler words that could sit on any link?" | 33 reports | 2 at review |
-| **Judge in context, as WCAG 2.4.4 does.** Second question: is the link text an item of the kind its heading announces (a tag under "Tags")? p = filler × (1 − item under heading). "click here" under "Pricing" still fails. | 2 | 0 |
+| **Classify in context, as WCAG 2.4.4 does.** Second question: is the link text an item of the kind its heading announces (a tag under "Tags")? p = filler × (1 − item under heading). "click here" under "Pricing" still fails. | 2 | 0 |
 | **Shape the state, do not grow it.** A heading over a list was paired with the first post's excerpt. The state now says "A list of 120 items. The first 5 are: …". | "Browse all posts" p = 0.62 to 0.88 | not reported |
 | **Thresholds in the measured gap.** Indirect titles over on-topic content reach 0.66; mismatches start at 0.81. | 4 at review | 0 |
 
@@ -315,7 +315,7 @@ fix was a different kind of state, which the parser supplies. TypeSafe's
 present to a panel of experts before asking them to make a judgment", in an object whose names keep "their
 relationships clear". From that:
 
-1. **Perceptual parity.** Send what the affected person perceives when the judgement matters: a screen
+1. **Perceptual parity.** Send what the affected person perceives when the classification matters: a screen
    reader user in a list of links gets the text and the heading above it, not the `href`.
 2. **Shape over size.** Prefer a fact the parser can state ("a list of 120 items") to more raw text.
 3. **Names that state the relationship.** `heading_above_link`, `content_under_heading`,
@@ -331,7 +331,7 @@ The HTML report now also shows, per rule, how many candidates were examined and 
 First run on a site neither of us wrote: 118 questions, $0.0021, nine findings. Read critically, one was a
 real defect scored too low, one was overstated, and one was noise. All three fixes were facts code already had.
 
-| Finding | Verdict | Fix |
+| Finding | Outcome | Fix |
 | --- | --- | --- |
 | Six cards each carry `aria-label="Card link"` (p = 0.52, review) | Real, and under-scored. Jev only half-recognised "Card link" as filler. | Code counts destinations per link name. A name shared by links to different places is ambiguous whatever it says: the heading rescue is dropped and the evidence needed is halved, p = 1 − (1 − filler) × 0.5. Now 0.81, reported once with all six destinations, and the hint quotes the card's own title. |
 | An `aria-label` that repeats the link's visible text, the product name, (p = 1.00, error) | Overstated. An exact repeat changes nothing a user hears. | Decided in code at review level. |
@@ -382,7 +382,7 @@ run-to-run variance of §6. (In this cold run wrapped missed one `comment-descri
 against a 0.5 threshold, which is what a 0.02 gap means: that rule sits on its threshold whatever the state
 looks like.)
 
-Real input decided it. Each input was judged three times: wrapped, wrapped again as a control for variance,
+Real input decided it. Each input was classified three times: wrapped, wrapped again as a control for variance,
 and flat.
 
 | Input | Candidates | Reported, wrapped | Flips, control | Flips, flat | Input tokens, wrapped → flat |
@@ -392,7 +392,7 @@ and flat.
 | Link aggregator front page, `link-text-purpose` | 152 | 25 | 0 | 0 | 84,557 → 83,198 |
 | this repo's own source | 241 | 12 | 2 | 4 | 102,452 → 100,489 |
 
-736 candidates of HTML: not one changed status. The repo's own source, judged by the four code rules, changed
+736 candidates of HTML: not one changed status. The repo's own source, classified by the four code rules, changed
 four, all of them new `review`-level reports, and it did so twice (a first pair of runs flipped two). The
 control shows the size of the noise: two flips, one in each direction, all four values between 0.45 and 0.53.
 
@@ -442,7 +442,7 @@ boundary between yes and no. Every Noul here had criteria, by habit. `scripts/cr
 them from one question at a time and re-runs the rule's fixtures cold. "Gap" is the lowest bad case minus
 the highest good case.
 
-| Question | Gap with → without | Recall without | Verdict |
+| Question | Gap with → without | Recall without | Decision |
 | --- | --- | --- | --- |
 | `describes_behaviour` (comment) | 0.07 → −0.40 | 1/6 | essential |
 | `only_restates` (comment) | 0.66 → 0.21 | 4/6 | essential |
@@ -513,11 +513,11 @@ tree-sitter parse. Every JS or TS file is read twice: as code, and for its marku
 become `class` and `for`; markup inside `{items.map(...)}` and `{open && ...}` is read; a component keeps its
 own name as the tag, so it matches no rule and its children are still seen. Anything computed at run time
 (`{step.title}`, `aria-label={copied ? "Copied" : "Copy"}`) becomes a dynamic marker, and the engine drops
-every candidate whose words contain it: judging half a label would be guessing.
+every candidate whose words contain it: classifying half a label would be guessing.
 
 | Input | Result |
 | --- | --- |
-| `guide.tsx` | 0 findings. Nearly all of its text is dynamic, so there was little to judge, and the `Snippet` report is gone. |
+| `guide.tsx` | 0 findings. Nearly all of its text is dynamic, so there was little to classify, and the `Snippet` report is gone. |
 | `fixtures/jsx/Checkout.tsx`, 13 planted defects | 12 found with file:line, including inside `.map()` and `&&`. The × button with `aria-label="Close"` is correctly left alone. |
 
 The thirteenth, a wrong heading, was skipped: its section contains `{item.name}`, so the candidate was
@@ -528,7 +528,7 @@ named for what it is, so `function-name-matches-body` skips it. And "×" is an i
 is about text a person could say aloud, so `aria-label-justified` only counts visible text containing a
 letter or digit, where before it would have reported `aria-label="Close"` for not containing "×".
 
-Not handled yet: a conditional between two stated strings could be judged once per branch; props passed to
+Not handled yet: a conditional between two stated strings could be classified once per branch; props passed to
 a component (`<Button label="Click here">`) are not read because the rule cannot know what the prop
 becomes; and Vue, Svelte, and Astro templates need their own grammars.
 
@@ -544,7 +544,7 @@ Seed 1: **138 pages**, 102 home and 36 form. To get them, 92 sites were skipped 
 150 for failing to load, 10 for having too little text, and 9 as unsuitable. The suitability check is a Jev
 question: a keyword list let an adult site through whose title was slang in another language.
 
-### Prevalence, before any judging
+### Prevalence, before any classifying
 
 `scripts/corpus/prevalence.ts` counts candidates with the parser alone. A perfect rule for a construct that
 occurs on one page in a hundred is worth little, and this is free to find out.
@@ -572,9 +572,9 @@ occurs on one page in a hundred is worth little, and this is free to find out.
 screens this corpus does not reach. Tables and legends are too rare here to prioritise. Link promise against
 destination has the most candidates of any idea. `class-implies-element` is a third of all questions.
 
-### The first judging run
+### The first classifying run
 
-40,623 judgements, 26,760 requests, 16.7M tokens, **$0.70**, 27 minutes at a paced 1,000 requests a minute.
+40,623 classifications, 26,760 requests, 16.7M tokens, **$0.70**, 27 minutes at a paced 1,000 requests a minute.
 5,916 were reported, about 15%, which is too many to be true. Reading the reports rule by rule, before
 asking anyone to label them, found four systematic faults. None was the model's.
 
@@ -582,7 +582,7 @@ asking anyone to label them, found four systematic faults. None was the model's.
 | --- | --- | --- | --- |
 | `aria-label-justified` | "The label must contain the visible text" was decided in code at p = 1. Most of 739 errors were cards whose link text is a title plus a paragraph, labelled with the title: a cloud provider's product cards, labelled with the product name. The label's words are on screen. | Four containment cases. A label that is part of the text is fine. A label with unrelated wording gets a question: do both mean the same thing. A label that extends the text is reported only when it adds nothing. | 976 errors to 186 |
 | `label-input-type` | Search boxes with `type="text"`. | `text` and `search` accept the same values; either satisfies either. | 109 errors to 30 |
-| `heading-describes-section` | News headlines that link to their article, judged against the bylines and related links under them; headings paired with cookie-notice text. | A headline that is a link needs prose under it to be judged. Consent-manager markup is skipped. | 85 reports to 36 |
+| `heading-describes-section` | News headlines that link to their article, classified against the bylines and related links under them; headings paired with cookie-notice text. | A headline that is a link needs prose under it to be classified. Consent-manager markup is skipped. | 85 reports to 36 |
 | `aria-hidden-hides-content` | Closed dialogs and collapsed accordion panels. They are hidden from sight too, which is correct. | The renderer stamps aria-hidden elements that are not visible either (`checkVisibility`, zero size, off canvas). Only the browser knows this. | needs a re-render of the corpus |
 
 Also: "Image of…" is a redundancy, so it is now decided at review level, not as an error; and
@@ -595,14 +595,14 @@ different places on one page; forms without a single `autocomplete` token. And 9
 
 ### Re-reading without asking
 
-`--cache-only` judges from the answer cache and counts what it cannot answer instead of guessing. After the
-fixes the whole corpus was re-judged in **6 seconds for $0**: 39,674 judgements, 5,013 reported, 503 left
-unjudged because their question or their words changed. Policy and extraction changes are free to evaluate;
+`--cache-only` classifies from the answer cache and counts what it cannot answer instead of guessing. After the
+fixes the whole corpus was re-classified in **6 seconds for $0**: 39,674 classifications, 5,013 reported, 503 left
+unclassified because their question or their words changed. Policy and extraction changes are free to evaluate;
 only a changed question or changed words cost anything.
 
 ### Labelling
 
-`scripts/corpus/sample.ts` draws, per rule, up to 8 reports across severities and 5 unreported judgements
+`scripts/corpus/sample.ts` draws, per rule, up to 8 reports across severities and 5 unreported classifications
 (those nearest the threshold, plus random ones), 126 items in all. They are loaded into a label bench that
 shows the claim, the element, the words the model saw, and what code established, and hides the probability
 and whether the tool reported it. `scripts/corpus/score.ts` turns the labels into precision and recall per
@@ -612,7 +612,7 @@ rule. `aria-hidden-hides-content` is left out of this round until the corpus is 
 
 ## 17. The first blind labels
 
-126 judgements from the corpus, labelled by someone who is not the prompt author, without seeing the
+126 classifications from the corpus, labelled by someone who is not the prompt author, without seeing the
 probability or whether the tool reported them. Up to 8 reports and 5 non-reports per rule, so every figure
 here is a small sample. "Recall" is a lower bound: the non-reports lean towards near-threshold cases.
 
@@ -641,7 +641,7 @@ What the labels taught, rule by rule:
   the text counts as filler, which the labeller's answers asked for.
 - **`description-matches-page`, 38%.** True and false were interleaved from 0.29 to 0.79. On a home page
   the description is a statement about the brand and the content is whatever comes first. The rule now
-  judges only pages whose `h1` sits inside an `<article>` or that declare `og:type` article, which leaves
+  classifies only pages whose `h1` sits inside an `<article>` or that declare `og:type` article, which leaves
   almost nothing in this corpus. **The corpus has no article pages**, and that is where the rule's one real
   find came from. It stays unvalidated until the corpus has them.
 - **`control-type-intent`.** All 13 sampled `href="#"` links were defects, including five the rule had let
@@ -664,8 +664,8 @@ Two notes from the labeller are policy, not accuracy: `type="search"` is the rig
 (the overnight change stopped reporting `type="text"` there), and "Departure" and "Arrival" should be
 `type="date"` (scored 0.36 and 0.46: the right direction, under-confident).
 
-`score.ts --against <judgements>` re-scores the same labels against a later run by joining on rule, page,
-and the words judged, so a fix can be checked in a minute without new labels.
+`score.ts --against <classifications>` re-scores the same labels against a later run by joining on rule, page,
+and the words classified, so a fix can be checked in a minute without new labels.
 
 ## 18. Truncation limits, measured
 
@@ -703,7 +703,7 @@ byline, or "in this section we will look at", the topic only appears after word 
 
 On 654 real corpus headings, 240 words reported nothing new. But with no limit a genuine mismatch, a
 "Crosswords" heading over a football photo caption, fell from 0.86 to 0.71 and out of the report: later
-paragraphs dilute the judgement of what a heading introduces. That is TypeSafe's "irrelevant state hurts",
+paragraphs dilute the classification of what a heading introduces. That is TypeSafe's "irrelevant state hurts",
 seen directly, and it is why the limit is 240 and not infinity. Sections that open on topic and drift
 later stayed unreported at every value, which is the right answer: the opening is what a reader skims.
 
@@ -743,11 +743,11 @@ more hop. About one kept site in four yields an article; the run ended with 43, 
 | 100k to 1m | 30 | 14 | 18 |
 
 174 pages from 128 domains. Three pages were dropped by hand after the run (two borderline topics, one
-spun content-farm page that alone produced 12% of all `link-text-purpose` reports); the re-judge came
+spun content-farm page that alone produced 12% of all `link-text-purpose` reports); the re-classify came
 from the cache. On article pages `description-matches-page` has a candidate on 79% (34 of its 45
 candidates), against 9% of home pages, so the rule can now be measured.
 
-**Judging.** 49,524 judgements, 5,954 reported (12%), none unjudged; the live run cost $0.84 for 20M
+**Classifying.** 49,524 classifications, 5,954 reported (12%), none unclassified; the live run cost $0.84 for 20M
 tokens in 33 minutes. One lesson from the fetcher: a step with no timeout of its own (`page.evaluate`
 around an in-page `fetch`) parked every worker behind feeds that never answered. Every wait now has a
 deadline.
@@ -755,12 +755,12 @@ deadline.
 **What the reports show, before any labels.** No rule was changed, so the labels test what is committed.
 
 1. `aria-label-justified` reports 80% of its candidates. 1,235 of its 1,341 reviews are decided by code
-   at a fixed 0.45 with no judgement involved: 732 labels that repeat the visible text exactly (case
+   at a fixed 0.45 with no classification involved: 732 labels that repeat the visible text exactly (case
    differences included) and 503 labels that do not contain it. The 129 errors and warnings, the part
-   Jev judged, are buried under them. This is a reporting-policy question, not a prompt question.
+   Jev classified, are buried under them. This is a reporting-policy question, not a prompt question.
    Decision: merge in the report. An assessment may name a `pattern`, worded for any number of elements;
    findings of one rule that share a pattern in one file become one finding at the first place, listing
-   every other. Judgements stay per element, so measurement is unchanged. The rule's 1,470 reports on
+   every other. Classifications stay per element, so measurement is unchanged. The rule's 1,470 reports on
    102 pages become 373.
 2. `aria-hidden-hides-content` reports 68%, piled between 0.4 and 0.6. With invisible content stamped
    out, what remains is visible duplication: the option list of a custom select, repeated marquee
@@ -779,7 +779,7 @@ deadline.
    visible caption", on two sites. Decision: an error. Alt text says what the image shows and a caption
    adds context; they do different jobs, and the finding now says so.
 7. `heading-describes-section` reports 1% of 1,714 headings and no errors. After round one the risk has
-   moved from precision to recall. It also judged a heading that was only punctuation.
+   moved from precision to recall. It also classified a heading that was only punctuation.
 8. A domain list is not a site list: one company appeared under three sampled domains with near-identical
    forms, and three domains carried spun variants of one article.
 
@@ -814,7 +814,7 @@ narrow question about very few words. `aria-label-justified` improved from 3/8 t
 rewritten question was for. Rules that were perfect on the first sample (`link-text-purpose`,
 `autocomplete-matches-label`) were not on the second: eight items is too few to call a rule perfect.
 
-**Most disagreements are facts code holds, not misjudgements.** Read one by one:
+**Most disagreements are facts code holds, not misclassifications.** Read one by one:
 
 - `link-text-purpose`: two of three false reports are phone numbers on `tel:` links. The destination is
   the number; code knows the scheme.
@@ -831,10 +831,10 @@ rewritten question was for. Rules that were perfect on the first sample (`link-t
   by "Last"). The rule asks whether the description is about another field; repetition is a different
   defect, and a string comparison finds it.
 - `alert-is-urgent`: the misses are "Field is required" messages at 0.22 to 0.32. The labeller would not
-  announce them assertively; the model thinks a validation error is urgent. This one is a judgement
+  announce them assertively; the model thinks a validation error is urgent. This one is a classification
   boundary, and the criteria should say which side validation messages fall on.
 
-The remaining false reports are judgement: marketing copy under a form's heading, part-of names from CSS
+The remaining false reports are classification: marketing copy under a form's heading, part-of names from CSS
 modules (`Header_subtitle__x`), a meta description that fits its page.
 
 **Fixes, and what they score.** Code only, except two criteria: `tel:` and `mailto:` links showing their
@@ -855,7 +855,7 @@ Against the same labels, which flatters: 59 of 75 reports right (79%, from 66%).
 with recall 10/10 (from 6/7 and 6/10), `label-input-type` 6/6, `link-text-purpose` 5/6,
 `describedby-describes` 2/2. `heading-describes-section` now reports 2 of its 13 labelled items, one
 right: it is close to silent, and partly a matter of taste. `class-implies-element` (3/7) and
-`aria-hidden-hides-content` (3/7) are unchanged in kind: their false reports are judgement, not facts.
+`aria-hidden-hides-content` (3/7) are unchanged in kind: their false reports are classification, not facts.
 A third sample of 55 unseen items, for the eight rules that changed, is the test of these numbers.
 
 **Two rules removed.** Taken over both rounds, `heading-describes-section` was right on 5 of 14 labelled
@@ -872,7 +872,7 @@ records what a successor to the class rule would need.
    fails everything; "is this only filler?" is bounded. When one rule produces a uniform cluster of
    findings on real input, suspect the question before believing the result.
 0. First strip out everything that is a lookup, a count, a pattern, or a string comparison. Ask Jev only
-   what is left, one atomic judgement per question, and combine the answers in code.
+   what is left, one atomic classification per question, and combine the answers in code.
 1. One candidate per request. Give it named fields, not raw markup.
 2. Withhold what the model must not lean on: the `href` in `link-text-purpose`, the input `type` in
    `label-input-type`. Compare against the withheld fact in code.
@@ -882,7 +882,7 @@ records what a successor to the class rule would need.
 5. Every rule returns a violation probability. The engine owns the thresholds, so tuning never touches a
    prompt.
 6. Tune thresholds on real pages. Fixtures only show that a prompt is sound.
-7. Make each question independent: it must not mention what another question judges.
+7. Make each question independent: it must not mention what another question classifies.
 8. When a finding looks wrong, print what the extractor produced before changing the prompt.
 9. Dogfood early. Fixtures written by the prompt author pass; real code does not.
 10. Criteria are for a subtle boundary. Measure whether each one earns its tokens

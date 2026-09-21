@@ -107,8 +107,8 @@ test("a question the rule leaves out is never sent and reaches assess as undefin
   };
   const source = `<img src="a.jpg" alt="IMG_4021">
 <figure><img src="b.jpg" alt="Our cat"><figcaption>Our cat on the stairs</figcaption></figure>`;
-  const { judgements, stats } = await run([{ path: "p.html", source }], { rules: [altTextQuality], ask, isolation: "candidate" });
-  assert.deepEqual(judgements.map((j) => Object.keys(j.answers)), [["is_placeholder"], ["is_placeholder", "repeats_caption"]]);
+  const { classifications, stats } = await run([{ path: "p.html", source }], { rules: [altTextQuality], ask, isolation: "candidate" });
+  assert.deepEqual(classifications.map((j) => Object.keys(j.answers)), [["is_placeholder"], ["is_placeholder", "repeats_caption"]]);
   assert.equal(stats.questions, 3);
   // The image without a caption carries no caption field at all, not a null one.
   assert.deepEqual(sent.map((s) => s.count), [1, 2]);
@@ -128,11 +128,11 @@ test("a rule's questions share one request and reach assess by name", async () =
     };
   };
   const source = `<figure><img src="b.jpg" alt="The bridge at sunset"><figcaption>The bridge at sunset.</figcaption></figure>`;
-  const { judgements } = await run([{ path: "p.html", source }], { rules: [altTextQuality], ask, isolation: "candidate" });
+  const { classifications } = await run([{ path: "p.html", source }], { rules: [altTextQuality], ask, isolation: "candidate" });
   assert.equal(questionsSeen.length, 1);
-  assert.deepEqual(Object.keys(judgements[0]!.answers), ["is_placeholder", "repeats_caption"]);
-  assert.equal(judgements[0]!.p, 0.9);
-  assert.match(judgements[0]!.message, /repeats the visible caption/);
+  assert.deepEqual(Object.keys(classifications[0]!.answers), ["is_placeholder", "repeats_caption"]);
+  assert.equal(classifications[0]!.p, 0.9);
+  assert.match(classifications[0]!.message, /repeats the visible caption/);
 });
 
 test("label-input-type caps a text-typed search box at review, but leaves other mismatches at their own severity", async () => {
@@ -147,29 +147,29 @@ test("label-input-type caps a text-typed search box at review, but leaves other 
       usage: { input_tokens: 1, output_tokens: 1 },
     };
   };
-  const { judgements } = await run([{ path: "p.html", source }], { rules: [labelInputType], ask, isolation: "candidate" });
+  const { classifications } = await run([{ path: "p.html", source }], { rules: [labelInputType], ask, isolation: "candidate" });
   // The search box is capped to review no matter how confident Jev is; the email-in-text mismatch is untouched.
-  assert.deepEqual(judgements.map((j) => [j.p, j.severity]), [[0.5, "review"], [0.993, "error"]]);
+  assert.deepEqual(classifications.map((j) => [j.p, j.severity]), [[0.5, "review"], [0.993, "error"]]);
 });
 
-test("cache-only mode never asks, judges what the cache answers, and counts the rest as unjudged", async () => {
+test("cache-only mode never asks, classifies what the cache answers, and counts the rest as unclassified", async () => {
   const cache = new AnswerCache(mkdtempSync(join(tmpdir(), "jev-lint-")));
   const warm = fakeAsk();
   await run([{ path: "a.html", source: `<a href="/a">click here</a>` }], { rules: [linkTextPurpose], ask: warm.ask, isolation: "candidate", cache });
 
   const never: Ask = async () => Promise.reject(new Error("the model must not be called"));
   const source = `<a href="/a">click here</a> <a href="/b">Pricing</a>`;
-  const { judgements, stats } = await run([{ path: "b.html", source }], { rules: [linkTextPurpose], ask: never, isolation: "candidate", cache, cacheOnly: true });
-  assert.deepEqual(judgements.map((j) => j.candidate.data.link_text), ["click here"]);
+  const { classifications, stats } = await run([{ path: "b.html", source }], { rules: [linkTextPurpose], ask: never, isolation: "candidate", cache, cacheOnly: true });
+  assert.deepEqual(classifications.map((j) => j.candidate.data.link_text), ["click here"]);
   assert.deepEqual([stats.requests, stats.unanswered], [0, 1]);
 });
 
-test("a pattern repeated across a file is reported once with every place, while judgements stay per element", async () => {
+test("a pattern repeated across a file is reported once with every place, while classifications stay per element", async () => {
   const { default: ariaLabelJustified } = await import("../src/rules/html/aria-label-justified.ts");
   const { ask } = fakeAsk();
   const source = `<a href="/a" aria-label="Blog">Blog</a>\n<a href="/b" aria-label="Docs">Docs</a>\n<a href="/c" aria-label="About">About</a>`;
-  const { findings, judgements } = await run([{ path: "p.html", source }], { rules: [ariaLabelJustified], ask, isolation: "candidate" });
-  assert.equal(judgements.length, 3);
+  const { findings, classifications } = await run([{ path: "p.html", source }], { rules: [ariaLabelJustified], ask, isolation: "candidate" });
+  assert.equal(classifications.length, 3);
   assert.equal(findings.length, 1);
   assert.match(findings[0]!.message, /^3 elements in this file: the aria-label repeats/);
   assert.deepEqual(findings[0]!.occurrences!.map(({ loc }) => loc.line), [1, 2, 3]);

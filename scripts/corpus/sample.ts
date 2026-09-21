@@ -1,6 +1,6 @@
-// Draws the labelling sample from <corpus>/judgements.json. Precision needs reported judgements and
+// Draws the labelling sample from <corpus>/classifications.json. Precision needs reported classifications and
 // recall needs unreported ones, so each rule contributes both: reports across its severities, the
-// unreported judgements closest to its threshold (where a miss is most likely), and a few random
+// unreported classifications closest to its threshold (where a miss is most likely), and a few random
 // unreported ones (so recall is not only measured at the edge). Identical words are sampled once.
 //
 //   node scripts/corpus/sample.ts [--corpus corpus] [--reported 8] [--unreported 5] [--seed 1] [--exclude <rule>]...
@@ -42,7 +42,7 @@ const shuffled = <T>(items: T[]): T[] => items.map((item) => [next(), item] as c
 
 /**
  * Round-robin over the page kinds, keeping each kind's own order. A rule behaves differently on a home
- * page, a form, and an article — `description-matches-page` only judges articles at all — and taking the
+ * page, a form, and an article — `description-matches-page` only classifies articles at all — and taking the
  * first n of a list sorted by anything else gave whichever kind happens to be most common.
  */
 function acrossKinds(items: Saved[]): Saved[] {
@@ -52,7 +52,7 @@ function acrossKinds(items: Saved[]): Saved[] {
   return out;
 }
 
-const all: Saved[] = JSON.parse(readFileSync(`${values.corpus}/judgements.json`, "utf8"));
+const all: Saved[] = JSON.parse(readFileSync(`${values.corpus}/classifications.json`, "utf8"));
 const sample: Saved[] = [];
 const rules = htmlRules.filter((rule) => !(values.exclude ?? []).includes(rule.id));
 for (const rule of rules) {

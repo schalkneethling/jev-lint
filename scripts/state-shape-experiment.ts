@@ -10,7 +10,7 @@ import { parseArgs } from "node:util";
 import { readAxeReport, type AxeResult } from "../src/axe/report.ts";
 import { createAsk } from "../src/engine/client.ts";
 import { run, type SourceFile } from "../src/engine/run.ts";
-import type { Judgement, StateShape } from "../src/engine/types.ts";
+import type { Classification, StateShape } from "../src/engine/types.ts";
 import { allRules } from "../src/rules/index.ts";
 
 const { values, positionals } = parseArgs({
@@ -36,7 +36,7 @@ async function onFixtures(): Promise<void> {
           // No cache: a shape that ran before would otherwise report zero tokens.
           const result = await run(read(`${dir}/${label}`), { rules: [rule], ask, isolation: "candidate", stateShape });
           tokens[stateShape] += result.stats.inputTokens;
-          return result.judgements;
+          return result.classifications;
         }),
       );
       const ps = { bad: bad!.map((j) => j.p), good: good!.map((j) => j.p) };
@@ -56,7 +56,7 @@ async function onFixtures(): Promise<void> {
   console.log(`input tokens: wrapped ${tokens.wrapped}, flat ${tokens.flat}`);
 }
 
-const keyOf = (j: Judgement) => `${j.ruleId} ${j.file} ${j.candidate.loc.line}:${j.candidate.loc.col}`;
+const keyOf = (j: Classification) => `${j.ruleId} ${j.file} ${j.candidate.loc.line}:${j.candidate.loc.col}`;
 
 async function onFiles(files: SourceFile[]): Promise<void> {
   const variants: { name: string; stateShape: StateShape }[] = [
@@ -66,8 +66,8 @@ async function onFiles(files: SourceFile[]): Promise<void> {
   ];
   const results = [];
   for (const { name, stateShape } of variants) {
-    const { judgements, stats } = await run(files, { rules, ask, isolation: "candidate", stateShape });
-    results.push({ name, stats, by: new Map(judgements.map((j) => [keyOf(j), j])) });
+    const { classifications, stats } = await run(files, { rules, ask, isolation: "candidate", stateShape });
+    results.push({ name, stats, by: new Map(classifications.map((j) => [keyOf(j), j])) });
   }
 
   const [baseline] = results;
@@ -111,7 +111,7 @@ if (positionals.length === 0 && !values.axe) {
       continue;
     }
     const axe = axeByUrl.get(path);
-    // Rendered once and reused by every variant, so all three judge the same DOM.
+    // Rendered once and reused by every variant, so all three classify the same DOM.
     files.push({ path, source: await renderer!.renderPage(path, axe), ...(axe && { axe }) });
   }
   await renderer?.closeBrowser();

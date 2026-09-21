@@ -1,10 +1,10 @@
 // Turns blind labels into precision and recall per rule. Export the labels from the label bench
 // into <corpus>/labels/labels/<id>.json first (the ArtifactData tool's `out_dir` does this), then:
 //
-//   node scripts/corpus/score.ts [--corpus corpus] [--against judgements.json]
+//   node scripts/corpus/score.ts [--corpus corpus] [--against classifications.json]
 //
-// With --against, the same labels score a later judging run: each labelled item is found again by its
-// rule, page, and the words that were judged, which stay the same when a question or a threshold
+// With --against, the same labels score a later classifying run: each labelled item is found again by its
+// rule, page, and the words that were classified, which stay the same when a question or a threshold
 // changes. An item the later run no longer selects counts as not reported. Scoring a fix against the
 // labels that motivated it flatters the fix; a fresh sample is the honest test.
 //
@@ -15,15 +15,15 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 
 const { values } = parseArgs({ options: { corpus: { type: "string", default: "corpus" }, against: { type: "string" } } });
-type Judged = { id: number; rule: string; page: string; p: number; severity: string | null; message: string; checked: Record<string, unknown> };
-const drawn: Judged[] = JSON.parse(readFileSync(`${values.corpus}/label-sample.json`, "utf8"));
+type Classified = { id: number; rule: string; page: string; p: number; severity: string | null; message: string; checked: Record<string, unknown> };
+const drawn: Classified[] = JSON.parse(readFileSync(`${values.corpus}/label-sample.json`, "utf8"));
 
 // Field names and nulls may change between runs; the words themselves identify the element.
-const wordsOf = (j: Judged) => `${j.rule}|${j.page}|${Object.values(j.checked).filter((value) => typeof value === "string").sort().join("|")}`;
+const wordsOf = (j: Classified) => `${j.rule}|${j.page}|${Object.values(j.checked).filter((value) => typeof value === "string").sort().join("|")}`;
 let dropped = 0;
-const sample: Judged[] = values.against
+const sample: Classified[] = values.against
   ? (() => {
-      const later = new Map((JSON.parse(readFileSync(values.against!, "utf8")) as Judged[]).map((j) => [wordsOf(j), j]));
+      const later = new Map((JSON.parse(readFileSync(values.against!, "utf8")) as Classified[]).map((j) => [wordsOf(j), j]));
       return drawn.map((j) => {
         const again = later.get(wordsOf(j));
         if (!again) dropped++;

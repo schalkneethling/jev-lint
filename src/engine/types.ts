@@ -13,7 +13,7 @@ export interface Loc {
   widget?: "accessibility overlay";
 }
 
-/** A small, self-contained slice of a file for Jev to judge. `data` is all the model sees. */
+/** A small, self-contained slice of a file for Jev to classify. `data` is all the model sees. */
 export interface Candidate {
   loc: Loc;
   data: { [key: string]: JsonValue };
@@ -69,7 +69,7 @@ export interface Rule<Q extends RuleQuestions = RuleQuestions, D = HtmlDoc> {
   /** Deterministic extraction. Anything a parser can decide is decided here. */
   select(doc: D): Candidate[];
   /**
-   * One atomic judgement per question, all asked of the same candidate in one request. They cannot see
+   * One atomic classification per question, all asked of the same candidate in one request. They cannot see
    * each other's answers. A question code already knows is moot is left out, and never sent.
    */
   questions(ref: Ref, candidate: Candidate): Q;
@@ -107,8 +107,8 @@ export type Isolation = "candidate" | "rule" | "file";
  */
 export type StateShape = "flat" | "wrapped";
 
-/** One judged candidate, kept in full so the eval harness can inspect raw answers. */
-export interface Judgement extends Assessment {
+/** One classified candidate, kept in full so the eval harness can inspect raw answers. */
+export interface Classification extends Assessment {
   ruleId: string;
   file: string;
   candidate: Candidate;
@@ -118,7 +118,7 @@ export interface Judgement extends Assessment {
 
 /**
  * A flag alone moves nobody. A finding carries what was checked and why it was reported, so a person
- * or a coding agent can act on it without re-deriving the judgement. Fixing it is out of scope.
+ * or a coding agent can act on it without re-deriving the classification. Fixing it is out of scope.
  */
 export interface Finding extends Assessment {
   ruleId: string;
@@ -144,6 +144,6 @@ export interface RunStats {
   questions: number;
   cacheHits: number;
   inputTokens: number;
-  /** Candidates left unjudged in cache-only mode because an answer they need was never asked. */
+  /** Candidates left unclassified in cache-only mode because an answer they need was never asked. */
   unanswered: number;
 }

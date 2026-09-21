@@ -45,7 +45,7 @@ export function stylish(findings: Finding[], stats: RunStats, options: { evidenc
     "",
     `${count("error")} errors, ${count("warn")} warnings, ${count("review")} to review, on ${byElement(findings).length} elements`,
     dim(
-      `${stats.questions} questions, ${stats.cacheHits} cached, ${stats.requests} requests, ${stats.inputTokens} input tokens (~$${cost.toFixed(5)})${stats.unanswered > 0 ? `, ${stats.unanswered} candidates unjudged (cache only)` : ""}`,
+      `${stats.questions} questions, ${stats.cacheHits} cached, ${stats.requests} requests, ${stats.inputTokens} input tokens (~$${cost.toFixed(5)})${stats.unanswered > 0 ? `, ${stats.unanswered} candidates unclassified (cache only)` : ""}`,
     ),
   );
   return lines.join("\n");

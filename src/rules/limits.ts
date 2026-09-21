@@ -1,13 +1,13 @@
 /**
  * How much of a candidate's text reaches the model. Jev allows 64k tokens per request and 32k for the
- * state, so none of these is near a hard limit: each is a judgement about where more words stop helping.
+ * state, so none of these is near a hard limit: each is a classification about where more words stop helping.
  * They live here, read at `select` time, so `scripts/truncation-experiment.ts` can vary one and re-select
  * in the same process without a forked copy of the rule. Nothing else writes them, so a normal run is
  * exactly what these defaults say.
  */
 export const limits = {
   /**
-   * Characters of code sent with the name, title, or comment it is judged against (`rules/code/shared.ts`).
+   * Characters of code sent with the name, title, or comment it is classified against (`rules/code/shared.ts`).
    * The old 1,500 hid the defect `function-name-matches-body` exists to find: on five long functions whose
    * surprising side effect came after character 1,500, recall was 0/5 at 1,500 and 5/5 at 6,000, with the
    * mean on bad cases at 0.12 against 0.90 and no false positive on five matched clean functions. Long test

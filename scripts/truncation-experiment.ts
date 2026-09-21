@@ -17,13 +17,13 @@
 //       Real input: how many candidates exceed each value, and how many change reported status.
 //
 //   varlock run -- node scripts/truncation-experiment.ts --limit hiddenTextWords --labels
-//       The blind-labelled corpus judgements for the rule, re-judged at each value.
+//       The blind-labelled corpus classifications for the rule, re-classified at each value.
 import { existsSync, globSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { parseCode } from "../src/code/parse.ts";
 import { createAsk } from "../src/engine/client.ts";
 import { run, type SourceFile } from "../src/engine/run.ts";
-import type { AnyRule, Judgement } from "../src/engine/types.ts";
+import type { AnyRule, Classification } from "../src/engine/types.ts";
 import { parseHtml } from "../src/html/parse.ts";
 import { allRules } from "../src/rules/index.ts";
 import { limits, withLimit, type LimitName } from "../src/rules/limits.ts";
@@ -152,9 +152,9 @@ const ruleFor = (limit: LimitName): AnyRule => {
   return rule;
 };
 
-/** Reported or not, per candidate, so two runs can be compared without depending on judgement order. */
-const statusOf = (judgements: Judgement[]) => new Map(judgements.map((j) => [`${j.file}:${j.candidate.loc.line}:${j.candidate.loc.col}`, j]));
-const flips = (before: Map<string, Judgement>, after: Map<string, Judgement>) =>
+/** Reported or not, per candidate, so two runs can be compared without depending on classification order. */
+const statusOf = (classifications: Classification[]) => new Map(classifications.map((j) => [`${j.file}:${j.candidate.loc.line}:${j.candidate.loc.col}`, j]));
+const flips = (before: Map<string, Classification>, after: Map<string, Classification>) =>
   [...before].filter(([key, j]) => (j.severity === null) !== ((after.get(key)?.severity ?? null) === null)).map(([key]) => key);
 
 // ---------------------------------------------------------------- the long labelled fixtures
@@ -166,7 +166,7 @@ async function onFixtures(limit: LimitName, rule: AnyRule): Promise<void> {
   const files = Object.fromEntries(["bad", "good"].map((side) => [side, read(`${dir}/${side}`).map((path) => ({ path, source: readFileSync(path, "utf8") }))]));
 
   const rows = [];
-  let current: Map<string, Judgement> | undefined;
+  let current: Map<string, Classification> | undefined;
   for (const variant of variantsOf(limit)) {
     // No cache is passed, so every variant is a cold run and pays for its own tokens.
     const { bad, good, tokens } = await withLimit(limit, variant.value, async () => {
@@ -175,14 +175,14 @@ async function onFixtures(limit: LimitName, rule: AnyRule): Promise<void> {
         ["bad", "good"].map(async (side) => {
           const result = await run(files[side]!, { rules: [rule], ask, isolation: "candidate" });
           tokens += result.stats.inputTokens;
-          return result.judgements;
+          return result.classifications;
         }),
       );
       return { bad: sides[0]!, good: sides[1]!, tokens };
     });
     const status = statusOf([...bad, ...good]);
     current ??= status;
-    const reported = (judgements: Judgement[]) => judgements.filter((j) => j.severity !== null).length;
+    const reported = (classifications: Classification[]) => classifications.filter((j) => j.severity !== null).length;
     rows.push({
       [limit]: variant.name,
       recall: `${reported(bad)}/${bad.length}`,
@@ -216,18 +216,18 @@ async function onRealInput(limit: LimitName, rule: AnyRule): Promise<void> {
   );
 
   const rows = [];
-  let current: Map<string, Judgement> | undefined;
+  let current: Map<string, Classification> | undefined;
   for (const variant of variantsOf(limit)) {
     const result = await withLimit(limit, variant.value, () => run(files, { rules: [rule], ask, isolation: "candidate", concurrency: 8 }));
-    const status = statusOf(result.judgements);
+    const status = statusOf(result.classifications);
     current ??= status;
     const changed = flips(current, status);
     rows.push({
       [limit]: variant.name,
-      candidates: result.judgements.length,
+      candidates: result.classifications.length,
       "over this value": untruncated ? over(untruncated, variant.value) : "n/a",
-      reported: result.judgements.filter((j) => j.severity !== null).length,
-      "mean p": mean(result.judgements.map((j) => j.p)).toFixed(3),
+      reported: result.classifications.filter((j) => j.severity !== null).length,
+      "mean p": mean(result.classifications.map((j) => j.p)).toFixed(3),
       "status changes": changed.length,
       tokens: result.stats.inputTokens,
     });
@@ -260,7 +260,7 @@ async function onLabels(limit: LimitName, rule: AnyRule): Promise<void> {
   const fileOf = new Map(manifest.pages.map((page) => [page.url, page.file]));
 
   const ask = createAsk();
-  // The labelled item names its page and the words that were judged; the same element is found again
+  // The labelled item names its page and the words that were classified; the same element is found again
   // at any limit because one of the two texts is always a prefix of the other.
   const anchor = (candidate: { data: Record<string, unknown> }, item: Drawn) =>
     Object.keys(item.checked).every((key) => {
@@ -271,7 +271,7 @@ async function onLabels(limit: LimitName, rule: AnyRule): Promise<void> {
   const rows = [];
   const track = new Map<number, string[]>();
   for (const variant of variantsOf(limit)) {
-    const judged = await withLimit(limit, variant.value, async () => {
+    const classified = await withLimit(limit, variant.value, async () => {
       const files: SourceFile[] = [];
       const wanted = new Map<string, Drawn[]>();
       for (const item of drawn) {
@@ -280,23 +280,23 @@ async function onLabels(limit: LimitName, rule: AnyRule): Promise<void> {
         wanted.set(file, [...(wanted.get(file) ?? []), item]);
       }
       for (const file of wanted.keys()) files.push({ path: file, source: readFileSync(file, "utf8") });
-      const { judgements } = await run(files, { rules: [rule], ask, isolation: "candidate", concurrency: 6 });
+      const { classifications } = await run(files, { rules: [rule], ask, isolation: "candidate", concurrency: 6 });
       return drawn.map((item) => {
-        const onPage = judgements.filter((j) => j.file === fileOf.get(item.page));
+        const onPage = classifications.filter((j) => j.file === fileOf.get(item.page));
         // An exact match first: two headings on one page where one name starts with the other would
         // otherwise be told apart by a prefix test that cannot tell them apart.
         return onPage.find((j) => Object.keys(item.checked).every((key) => String(item.checked[key] ?? "") === String(j.candidate.data[key] ?? ""))) ?? onPage.find((j) => anchor(j.candidate, item));
       });
     });
     for (const [index, item] of drawn.entries()) {
-      track.set(item.id, [...(track.get(item.id) ?? []), judged[index] ? judged[index]!.p.toFixed(2) : "—"]);
+      track.set(item.id, [...(track.get(item.id) ?? []), classified[index] ? classified[index]!.p.toFixed(2) : "—"]);
     }
-    const decided = drawn.map((item, index) => ({ given: labels.get(`j${item.id}`), j: judged[index] })).filter((entry) => entry.given === "yes" || entry.given === "no");
+    const decided = drawn.map((item, index) => ({ given: labels.get(`j${item.id}`), j: classified[index] })).filter((entry) => entry.given === "yes" || entry.given === "no");
     const trueOnes = decided.filter((entry) => entry.given === "yes");
     const falseOnes = decided.filter((entry) => entry.given === "no");
     rows.push({
       [limit]: variant.name,
-      found: `${judged.filter(Boolean).length}/${drawn.length}`,
+      found: `${classified.filter(Boolean).length}/${drawn.length}`,
       "mean p, labelled true": mean(trueOnes.map((entry) => entry.j?.p ?? 0)).toFixed(2),
       "mean p, labelled false": mean(falseOnes.map((entry) => entry.j?.p ?? 0)).toFixed(2),
       "reported, true": `${trueOnes.filter((entry) => entry.j?.severity).length}/${trueOnes.length}`,
@@ -311,7 +311,7 @@ async function onLabels(limit: LimitName, rule: AnyRule): Promise<void> {
       id: item.id,
       label: labels.get(`j${item.id}`) ?? "—",
       item: String(item.checked.heading ?? Object.values(item.checked)[0] ?? "").slice(0, 34),
-      "words judged when labelled": Math.max(...Object.values(item.checked).map((value) => (typeof value === "string" ? words(value) : 0))),
+      "words classified when labelled": Math.max(...Object.values(item.checked).map((value) => (typeof value === "string" ? words(value) : 0))),
       "p per variant": track.get(item.id)!.join("  "),
     })),
   );

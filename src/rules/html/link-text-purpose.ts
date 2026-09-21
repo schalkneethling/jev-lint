@@ -22,7 +22,7 @@ export const isFillerText = (field: string) =>
   );
 
 /**
- * WCAG 2.4.4 judges link purpose in context, and lists the preceding heading as an advisory way to
+ * WCAG 2.4.4 classifies link purpose in context, and lists the preceding heading as an advisory way to
  * supply it (technique H80). A one-word tag under "Tags" is clear; "click here" under "Pricing" is
  * not, because the heading names a topic and the link names nothing in it. Asking whether the text
  * is an item of the kind the heading announces separates the two without weighing them in one question.

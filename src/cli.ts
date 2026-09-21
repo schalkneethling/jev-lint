@@ -40,7 +40,7 @@ if ((positionals.length === 0 && !values.axe) || !ISOLATIONS.includes(values.iso
       "  --evidence           stylish: show Jev's measurements and code's facts under each finding",
       "  --isolation <mode>   candidate (default), rule, or file",
       "  --no-cache           ask Jev again even for unchanged input",
-      "  --cache-only         never call Jev; judge only what the cache can answer (needs no API key)",
+      "  --cache-only         never call Jev; classify only what the cache can answer (needs no API key)",
     ].join("\n"),
   );
   process.exit(2);
@@ -73,7 +73,7 @@ for (const path of paths) {
 await renderer?.closeBrowser();
 
 const rules = values.rule ? allRules.filter((rule) => values.rule!.includes(rule.id)) : allRules;
-const { findings, judgements, stats } = await run(files, {
+const { findings, classifications, stats } = await run(files, {
   rules,
   // Without credentials the client cannot even be built, and cache-only mode never uses it.
   ask: values["cache-only"] ? async () => Promise.reject(new Error("cache-only")) : createAsk(),
@@ -82,14 +82,14 @@ const { findings, judgements, stats } = await run(files, {
   cache: values["no-cache"] ? undefined : new AnswerCache(".jev-lint-cache"),
 });
 
-const judged = new Map<string, number>();
-for (const j of judgements) judged.set(j.ruleId, (judged.get(j.ruleId) ?? 0) + 1);
+const classified = new Map<string, number>();
+for (const j of classifications) classified.set(j.ruleId, (classified.get(j.ruleId) ?? 0) + 1);
 
 const report =
   values.format === "json"
     ? json(findings, stats)
     : values.format === "html" || values.format === "html-fragment"
-      ? html(findings, stats, { targets, judged, withAxe: values.axe !== undefined, standalone: values.format === "html" })
+      ? html(findings, stats, { targets, classified, withAxe: values.axe !== undefined, standalone: values.format === "html" })
       : stylish(findings, stats, { evidence: values.evidence });
 
 if (values.output) {
