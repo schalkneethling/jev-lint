@@ -1,5 +1,6 @@
 import { styleText } from "node:util";
 import type { Finding, RunStats, Severity } from "../engine/types.ts";
+import type { VerifyStats } from "../engine/verify.ts";
 import { byElement } from "./group.ts";
 
 const COLORS = { error: "red", warn: "yellow", review: "cyan" } as const satisfies Record<Severity, string>;
@@ -17,7 +18,7 @@ function measurement(value: Finding["measurements"][string]): string {
 }
 
 /** One block per element: what it is, each finding about it, and the evidence behind each. */
-export function stylish(findings: Finding[], stats: RunStats, options: { evidence: boolean }): string {
+export function stylish(findings: Finding[], stats: RunStats, options: { evidence: boolean; verification?: VerifyStats }): string {
   const lines: string[] = [];
   for (const [file, inFile] of Map.groupBy(findings, (f) => f.file)) {
     lines.push("", styleText("underline", file));
@@ -26,6 +27,7 @@ export function stylish(findings: Finding[], stats: RunStats, options: { evidenc
       for (const f of element.findings) {
         lines.push(`    ${styleText(COLORS[f.severity], f.severity.padEnd(6))} ${f.message}  ${dim(`${f.ruleId} p=${f.p.toFixed(2)}`)}`);
         if (f.hint) lines.push(`           ${f.hint}`);
+        if (f.confirmed) lines.push(`           ${styleText("green", "confirmed")}  ${f.confirmed.reason}`);
         if (f.occurrences) {
           const places = f.occurrences.map(({ loc }) => `${loc.line}:${loc.col}`);
           lines.push(dim(`           at ${places.slice(0, SHOWN_PLACES).join(", ")}${places.length > SHOWN_PLACES ? ` and ${places.length - SHOWN_PLACES} more` : ""}`));
@@ -45,8 +47,16 @@ export function stylish(findings: Finding[], stats: RunStats, options: { evidenc
     "",
     `${count("error")} errors, ${count("warn")} warnings, ${count("review")} to review, on ${byElement(findings).length} elements`,
     dim(
-      `${stats.questions} questions, ${stats.cacheHits} cached, ${stats.requests} requests, ${stats.inputTokens} input tokens (~$${cost.toFixed(5)})${stats.unanswered > 0 ? `, ${stats.unanswered} candidates unclassified (cache only)` : ""}`,
+      `${stats.questions} questions, ${stats.cacheHits} cached, ${stats.requests} requests, ${stats.inputTokens} input tokens (~$${cost.toFixed(5)})${stats.unanswered > 0 ? `, ${stats.unanswered} candidates unclassified (cache only)` : ""}${stats.suppressed > 0 ? `, ${stats.suppressed} suppressed in source` : ""}${stats.unchanged > 0 ? `, ${stats.unchanged} candidates skipped as unchanged` : ""}${stats.baselined > 0 ? `, ${stats.baselined} findings already in the baseline` : ""}`,
     ),
   );
+  const v = options.verification;
+  if (v) {
+    lines.push(
+      dim(
+        `second reader (${v.model}): ${v.confirmed} confirmed, ${v.rejected} rejected and left out${v.unverified > 0 ? `, ${v.unverified} not verified and reported as Jev left them` : ""}${v.cached > 0 ? `, ${v.cached} verdicts from cache` : ""}${v.costUsd > 0 ? ` (~$${v.costUsd.toFixed(2)})` : ""}`,
+      ),
+    );
+  }
   return lines.join("\n");
 }

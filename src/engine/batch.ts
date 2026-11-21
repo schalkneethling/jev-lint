@@ -8,7 +8,7 @@ export interface Item {
 
 /** One request: a state plus the items classified against it, each able to name its fields in that state. */
 export interface Batch {
-  state: EntryType;
+  state: NonNullable<EntryType>;
   entries: { item: Item; ref: Ref }[];
 }
 

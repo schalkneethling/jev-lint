@@ -41,6 +41,7 @@ export function locOf(el: Element): Loc {
     line: loc?.startLine ?? 1,
     col: loc?.startCol ?? 1,
     ...(quote && { span: { start: quote.startOffset, end: quote.endOffset } }),
+    ...(loc && { lines: { first: loc.startLine, last: loc.endLine } }),
     ...(axe && { axe: axe.split(" ").map(Number) }),
     ...(isAccessibilityOverlay(el) && { widget: "accessibility overlay" as const }),
   };

@@ -1,6 +1,6 @@
 import { noul, TypeSafeClient } from "@typesafe-ai/sdk";
 
-const client = new TypeSafeClient({ defaultModel: "jev-1.13.0" });
+const client = new TypeSafeClient({ defaultModel: "jev-1.14.0" });
 const { answers, usage, model } = await client.systemOne({
   state: { link: { text: "click here", href: "/pricing" } },
   questions: {

@@ -16,11 +16,23 @@ import { run } from "../../src/engine/run.ts";
 import { allRules, htmlRules } from "../../src/rules/index.ts";
 import { placeOf, readCorpus } from "./corpus.ts";
 
-const { values } = parseArgs({ options: { corpus: { type: "string", default: "corpus" }, "cache-only": { type: "boolean", default: false } } });
+const { values } = parseArgs({
+  options: {
+    corpus: { type: "string", default: "corpus" },
+    "cache-only": { type: "boolean", default: false },
+    // One rule at a time, written to its own file, so that several people can each work on a rule at once.
+    rule: { type: "string", multiple: true },
+    out: { type: "string" },
+  },
+});
 const corpus = readCorpus(values.corpus);
 // Nothing in a code corpus was rendered in a browser, so there is no axe report to join against.
 const axeByFile = corpus.code ? new Map<string, never[]>() : readAxeReport(`${values.corpus}/axe-report.json`);
-const rules = corpus.code ? allRules : htmlRules;
+const rules = (corpus.code ? allRules : htmlRules).filter((rule) => !values.rule || values.rule.includes(rule.id));
+const unknown = (values.rule ?? []).filter((id) => !rules.some((rule) => rule.id === id));
+if (unknown.length > 0) throw new Error(`No rule matches ${unknown.join(", ")}`);
+// A run of some rules must not replace the file a run of every rule wrote, which the other scripts read.
+const out = values.out ?? (values.rule ? `classifications-${values.rule.join("+")}.json` : "classifications.json");
 
 // Tens of thousands of requests against a limit of 1,200 a minute: pace them, and retry the ones that
 // still fail, because one rejected request would otherwise end a run that takes half an hour.
@@ -102,7 +114,7 @@ const saved = classifications.map((j, index) => {
     axePassed: onElement.filter((result) => result.outcome === "passed").map((result) => result.rule),
   };
 });
-writeFileSync(`${values.corpus}/classifications.json`, JSON.stringify(saved));
+writeFileSync(`${values.corpus}/${out}`, JSON.stringify(saved));
 
 const histogram = (ps: number[]) => Array.from({ length: 5 }, (_, i) => ps.filter((p) => Math.min(4, Math.floor(p * 5)) === i).length).join(" ");
 const unit = corpus.code ? "files" : "pages";

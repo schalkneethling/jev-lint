@@ -1,15 +1,20 @@
+import { relative, resolve } from "node:path";
 import type { Question, ResultFor } from "@typesafe-ai/sdk";
 import { FORM_CHECKS, type AxeResult } from "../axe/report.ts";
 import { DYNAMIC, parseJsx } from "../code/jsx.ts";
 import { isCodeFile, parseCode } from "../code/parse.ts";
 import { parseHtml } from "../html/parse.ts";
+import { fingerprintOf } from "./baseline.ts";
 import { toBatches, type Batch, type Item } from "./batch.ts";
 import { AnswerCache } from "./cache.ts";
+import { touches, type LineRanges } from "./changed.ts";
 import { MODEL, type Ask } from "./client.ts";
+import { readSuppressions, suppressionsFrom, type Suppressions } from "./suppress.ts";
 import {
   severityFor,
   type AnyRule,
   type Assessment,
+  type Candidate,
   type Finding,
   type Isolation,
   type Classification,
@@ -33,6 +38,32 @@ export interface RunOptions {
   cacheOnly?: boolean;
   cache?: AnswerCache;
   concurrency?: number;
+  /**
+   * Changed lines per file path. When given, only candidates whose lines overlap a change are classified,
+   * and a file that is not listed has none. This is the mode for a pull request or a pre-commit hook: the
+   * words most likely to have gone false are the ones next to code that just changed.
+   */
+  changed?: Map<string, LineRanges>;
+  /** The project's conventions, in plain sentences, for the rules that read them (`Rule.readsConventions`). */
+  conventions?: string[];
+  /**
+   * Fingerprints of findings the project has already recorded (`baseline.ts`), and the directory its file
+   * paths are relative to. A finding in the baseline is counted and not reported.
+   */
+  baseline?: { known: Set<string>; root: string };
+  /**
+   * The directory being linted. Rules that read a file's path (is this a test file?) see it relative to this
+   * directory, so that a project checked out under `~/work/test-harness/` is not taken for one big test.
+   */
+  root?: string;
+}
+
+export interface RunResult {
+  classifications: Classification[];
+  /** Every classification that reached a severity and was not switched off in the source: what a new baseline records. */
+  reported: Classification[];
+  findings: Finding[];
+  stats: RunStats;
 }
 
 export interface SourceFile {
@@ -42,13 +73,8 @@ export interface SourceFile {
   axe?: AxeResult[];
 }
 
-export interface RunResult {
-  classifications: Classification[];
-  findings: Finding[];
-  stats: RunStats;
-}
-
-async function pool<T>(tasks: (() => Promise<T>)[], limit: number): Promise<T[]> {
+/** Runs the tasks at most `limit` at a time and returns their results in the order given. */
+export async function pool<T>(tasks: (() => Promise<T>)[], limit: number): Promise<T[]> {
   const results: T[] = new Array(tasks.length);
   let next = 0;
   const worker = async () => {
@@ -66,6 +92,8 @@ const SNIPPET_LIMIT = 160;
 function measurementOf(answer: ResultFor<Question>): Finding["measurements"][string] {
   if (answer.type === "noul") return answer.noul;
   if (answer.type === "score") return answer.score;
+  // Rules classify words. A Box locates something in an image, which no rule asks for.
+  if (answer.type === "box") throw new Error("A rule asked a Box question; rules classify text only.");
   return { choice: answer.choice, probability: answer.probabilities[answer.choice]! };
 }
 
@@ -110,9 +138,28 @@ export function mergePatterns(findings: Finding[]): Finding[] {
   });
 }
 
+/** A file's path as rules see it: relative to the linted directory when the file is inside it. */
+function nameIn(root: string | undefined, path: string): string {
+  if (root === undefined) return path;
+  const inside = relative(resolve(root), resolve(path));
+  return inside.startsWith("..") ? path : inside;
+}
+
+/** Gives each rule that derives facts across candidates its own classifications, and takes back what it restates. */
+function reconciled(classifications: Classification[], rules: AnyRule[]): Classification[] {
+  const restated = new Map<Classification, Classification>();
+  for (const rule of rules) {
+    if (!rule.reconcile) continue;
+    const mine = classifications.filter((j) => j.ruleId === rule.id);
+    const assessments = rule.reconcile(mine.map((j) => ({ candidate: j.candidate, file: j.file, assessment: { p: j.p, message: j.message, ...(j.hint !== undefined && { hint: j.hint }), ...(j.pattern !== undefined && { pattern: j.pattern }) } })));
+    mine.forEach((j, i) => restated.set(j, { ...j, ...assessments[i]!, severity: severityFor(assessments[i]!.p, rule.thresholds) }));
+  }
+  return classifications.map((j) => restated.get(j) ?? j);
+}
+
 export async function run(files: SourceFile[], options: RunOptions): Promise<RunResult> {
-  const { rules, ask, isolation, maxCandidates, stateShape, cache, cacheOnly = false, concurrency = 8 } = options;
-  const stats: RunStats = { requests: 0, questions: 0, cacheHits: 0, inputTokens: 0, unanswered: 0 };
+  const { rules, ask, isolation, maxCandidates, stateShape, cache, cacheOnly = false, concurrency = 8, changed, conventions = [], baseline, root } = options;
+  const stats: RunStats = { requests: 0, questions: 0, cacheHits: 0, inputTokens: 0, unanswered: 0, suppressed: 0, unchanged: 0, baselined: 0 };
 
   // Identical candidates (the same "Read more" link thirty times) produce identical requests.
   // Sharing the in-flight promise means each distinct request is sent once per run.
@@ -128,7 +175,7 @@ export async function run(files: SourceFile[], options: RunOptions): Promise<Run
       const byKey = new Map(keys.map((key, i) => [key, questions[i]!]));
       const result = await ask(batch.state, Object.fromEntries(missing.map((key, i) => [`q${i}`, byKey.get(key)!])));
       stats.requests += 1;
-      stats.inputTokens += result.usage.input_tokens;
+      stats.inputTokens += result.usage.input_tokens ?? 0;
       missing.forEach((key, i) => {
         const answer = result.answers[`q${i}`] as ResultFor<Question>;
         answers.set(key, answer);
@@ -179,19 +226,32 @@ export async function run(files: SourceFile[], options: RunOptions): Promise<Run
   }
 
   const decided: Classification[] = [];
+  const codeSuppressions = new Map<string, Suppressions>();
   const perFile = await Promise.all(
     files.map(async (file) => {
       // A JS or TS file is read twice: as code, and for the markup in its JSX, which the HTML rules classify.
-      const docs = isCodeFile(file.path)
-        ? ([["code", await parseCode(file.path, file.source)], ["html", await parseJsx(file.path, file.source)]] as const)
+      const code = isCodeFile(file.path) ? await parseCode(file.path, file.source) : undefined;
+      if (code) codeSuppressions.set(file.path, suppressionsFrom(code.rawComments));
+      const docs = code
+        ? ([["code", { ...code, file: nameIn(root, file.path) }], ["html", await parseJsx(file.path, file.source)]] as const)
         : ([["html", parseHtml(file.path, file.source)]] as const);
-      const items: Item[] = docs.flatMap(([target, doc]) =>
+      const selected: Item[] = docs.flatMap(([target, doc]) =>
         rules
           .filter((rule) => rule.target === target)
-          .flatMap((rule) => rule.select(doc).map((candidate) => ({ rule, candidate })))
+          .flatMap((rule) =>
+            rule.select(doc).map((candidate: Candidate) => ({
+              rule,
+              // Conventions are facts about the project that the candidate's own words cannot show.
+              candidate: rule.readsConventions && conventions.length > 0 ? { ...candidate, data: { ...candidate.data, project_conventions: conventions } } : candidate,
+            })),
+          )
           // Words computed at run time cannot be classified from source; half a label would be a guess.
           .filter(({ candidate }) => !JSON.stringify(candidate.data).includes(DYNAMIC)),
       );
+      const ranges = changed?.get(file.path) ?? [];
+      // A candidate with no recorded lines is kept: leaving it out would be a silent loss of recall.
+      const items = changed ? selected.filter(({ candidate }) => !candidate.loc.lines || touches(ranges, candidate.loc.lines)) : selected;
+      stats.unchanged += selected.length - items.length;
       // Candidates that code already decided are reported directly and never reach the model.
       for (const item of items) if (item.candidate.decided) decided.push(toClassification(file.path, item, item.candidate.decided, {}));
       return toBatches(items.filter((item) => !item.candidate.decided), isolation, maxCandidates, stateShape).map(
@@ -201,10 +261,21 @@ export async function run(files: SourceFile[], options: RunOptions): Promise<Run
   );
   const tasks = perFile.flat();
 
-  const classifications = [...decided, ...(await pool(tasks, concurrency)).flat()];
+  const classifications = reconciled([...decided, ...(await pool(tasks, concurrency)).flat()], rules);
   const sources = new Map(files.map((file) => [file.path, file]));
-  const findings: Finding[] = mergePatterns(classifications.flatMap((j) => (j.severity === null ? [] : [toFinding(j, j.severity, sources.get(j.file)!)])))
+  // A code file's directives come from the comments its parser found; markup is scanned for them.
+  const suppressions = new Map(files.map((file) => [file.path, codeSuppressions.get(file.path) ?? readSuppressions(file.source)]));
+  const reported = classifications.filter((j) => {
+    if (j.severity === null) return false;
+    const { line, lines } = j.candidate.loc;
+    const off = suppressions.get(j.file)!.covers(j.ruleId, line, ...(lines ? [lines.first] : []));
+    if (off) stats.suppressed++;
+    return !off;
+  });
+  const fresh = baseline ? reported.filter((j) => !baseline.known.has(fingerprintOf(j, baseline.root))) : reported;
+  stats.baselined = reported.length - fresh.length;
+  const findings: Finding[] = mergePatterns(fresh.map((j) => toFinding(j, j.severity!, sources.get(j.file)!)))
     .sort((a, b) => a.file.localeCompare(b.file) || a.loc.line - b.loc.line || a.loc.col - b.loc.col);
 
-  return { classifications, findings, stats };
+  return { classifications, reported, findings, stats };
 }

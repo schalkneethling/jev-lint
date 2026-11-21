@@ -5,11 +5,8 @@ import type { EntryType, Question, ResultFor } from "@typesafe-ai/sdk";
 
 type Answer = ResultFor<Question>;
 
-/**
- * Answers are independent per question, so they are cached per (model, state, question).
- * A rerun over unchanged input costs nothing and returns identical results.
- */
-export class AnswerCache {
+/** One JSON file per key in a directory. A missing or unreadable file is a miss, never an error. */
+export class JsonStore<T> {
   readonly #dir: string;
 
   constructor(dir: string) {
@@ -17,11 +14,11 @@ export class AnswerCache {
     mkdirSync(dir, { recursive: true });
   }
 
-  static key(model: string, state: EntryType, question: Question): string {
-    return createHash("sha256").update(JSON.stringify([model, state, question])).digest("hex");
+  static hash(parts: unknown): string {
+    return createHash("sha256").update(JSON.stringify(parts)).digest("hex");
   }
 
-  get(key: string): Answer | undefined {
+  get(key: string): T | undefined {
     try {
       return JSON.parse(readFileSync(join(this.#dir, `${key}.json`), "utf8"));
     } catch {
@@ -29,7 +26,17 @@ export class AnswerCache {
     }
   }
 
-  set(key: string, answer: Answer): void {
-    writeFileSync(join(this.#dir, `${key}.json`), JSON.stringify(answer));
+  set(key: string, value: T): void {
+    writeFileSync(join(this.#dir, `${key}.json`), JSON.stringify(value));
+  }
+}
+
+/**
+ * Answers are independent per question, so they are cached per (model, state, question).
+ * A rerun over unchanged input costs nothing and returns identical results.
+ */
+export class AnswerCache extends JsonStore<Answer> {
+  static key(model: string, state: EntryType, question: Question): string {
+    return JsonStore.hash([model, state, question]);
   }
 }

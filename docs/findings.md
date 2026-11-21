@@ -966,7 +966,388 @@ comment. Reports fell from 17% to 10% of candidates.
 The blind sample is 72 items, drawn across repositories as well as kinds so that no house style can
 dominate a rule.
 
-## 23. Working rules for writing a Jev lint
+## 24. Jev 1.14, and a panel of model labellers
+
+On 2026-11-20 the SDK moved to 0.7.0 and the model pin to `jev-1.14.0`. The rule thresholds had been tuned
+against 1.13, so the whole code corpus was classified again before anything else changed: 7,565
+classifications, $0.12, five minutes. Report rates moved by a point or two per rule and no rule changed
+character, so 1.14 is the baseline for everything below.
+
+The human label bench is the honest measure and it is slow: 14 of its 72 code items were labelled in two
+months. To score a change within minutes, `scripts/panel/` adds a **panel of model labellers**. It works
+like the bench:
+
+```
+classifications.json ──draw.ts──▶ items-<n>.json   blind: the claim, the words, the file and line; no probability, no severity
+                                  sample.json      hidden: what the tool concluded
+items-<n>.json ──one Opus and one Fable agent per chunk, each following labeller.md──▶ labels-<labeller>-<n>.json
+labels + sample ──score.ts──▶ precision per rule, per labeller and by consensus; the disagreements with each labeller's reason
+```
+
+Three things differ from the human bench, and each is deliberate.
+
+- **A labeller opens the file.** The human labelled a snippet, and four of his 14 notes say the snippet was
+  missing something (a `describe` title, a sibling function, a project convention). A model labeller is told
+  to read around the line whenever the snippet does not settle the claim.
+- **Two answers per item**: is the claim true, and would a careful reviewer want it raised. A finding counts
+  as right only when both labellers say yes to both. The tool is for few, certain findings, and "true, but
+  nobody would say it in review" is the largest class of report there is (see §25).
+- **No round repeats a word from an earlier round.** `panel-seen.json` records every item drawn, so each
+  round is unseen by the fixes before it. (Within round 1, the 14 human-labelled items were added on top of
+  the normal draw, and two tests are therefore in it twice.)
+
+Against the 14 human labels, on "is the claim true": Opus agreed on 10, Fable on 9. Every disagreement but
+one ran the same way: the human said true and the panel said false, on a claim that is true of the snippet
+and false in its file (a `verify…` helper in a codebase where they all report through a context; a test
+that returns a promise and so does fail on rejection). The two labellers agreed with each other on 94%,
+91% and 89% of items in the three rounds. So the panel is **stricter than the human and consistent with
+itself**, and a number from it is a lower bound on what he would call right.
+
+**The baseline, round 1** (100 items, the rules as they stood, on 1.14): the panel called **12 of 58 errors
+and warnings right, 21%.**
+
+| Rule | Errors and warnings right | Reported right | What the labellers said about the rest |
+| --- | --- | --- | --- |
+| `test-title-matches-body` | 4/12 | 5/14 | a `test.before("setup")` hook read as a test; smoke tests with no assertion |
+| `function-name-matches-body` | 5/14 | 5/16 | names a framework dictates (`destroy`, `before`, a Proxy's `get`); spies in test files; memoisation |
+| `comment-describes-code` | 1/11 | 1/12 | the comment heads a block and was paired with its first line; commented-out code; cheat-sheet pseudo-code |
+| `swallowed-error-justified` | 2/12 | 2/12 | the reason was a comment above the `try`, a default set before it, or a fallback after it |
+| `comment-gives-reason` | 0/8 | 0/12 | true 10 times in 12 by both labellers, and wanted 0 times: a step heading helps a reader scan |
+
+The probabilities did not rank either: right test reports had a mean of 0.91 and wrong ones 0.92.
+
+## 25. What each rule got, and why
+
+Every change below answers a cause a labeller named. The right-hand column says how it was scored, because
+that is not the same for all of them (§28).
+
+| Rule | Cause the panel named | Change | Scored |
+| --- | --- | --- | --- |
+| `function-name-matches-body` | Names that promise nothing were being classified. All four right reports that a prefix can recognise had a name that promises an answer. | Only `get…`, `is…`, `parse…` and their kind; not in test files; not methods of object literals; not `getOrCreate…`; not bodies that cannot act. Thresholds 0.90 / 0.78 / 0.70. | selection and thresholds, on cached answers |
+| the same | "Returns nothing" is a second defect, and the parser can see it. | `isReady()` that returns no value on any path is held at review at least, unless the answer leaves through a callback or a response, or the body is a stub. | panel round 3 |
+| the same | 43% of reports came from 5 repositories, each with one house style (§22). | `reconcile`: when at least half of five or more functions sharing a prefix are reported, they become one finding per file at review, with the count. `conventions` in the config tells Jev the convention as a fact. | unit tests only |
+| `test-title-matches-body` | Hooks are not tests. A test with no assertion claims only that the code runs. | Hooks skipped; only tests that hold an assertion. No review band: below 0.88 most reports were wrong. | selection and thresholds, on cached answers |
+| `test-assertions-can-fail` (new) | `assert.ok(true)`, and every assertion inside an `if`: the title's assertions are there and never fail or never run. | Read from the syntax tree. Asks Jev nothing. | panel round 3 |
+| `boolean-name-holds-boolean` (new) | A variable named `is…` that holds a string. | Read from the syntax tree. Asks Jev nothing. | panel round 3 |
+| `doc-matches-function` (new) | A doc block at odds with its function was the second largest family of defects reviewers found by reading (§26). | JSDoc summary, name and body; two questions, as for comments. | panel round 2 |
+| `comment-describes-code` | The comment was classified against too little code, and "accurate" read vague as wrong. | The section the comment heads, or the whole body when it opens one. Asks for a contradiction. Skips commented-out code, comments above declarations, unparsed code. | **not scored** |
+| `swallowed-error-justified` | The reason sat outside the catch block. | The comment above and the statements around are sent; three classes; `.catch(() => {})` is found; a `try` that assigns an outer variable is skipped. | **not scored** |
+| `error-message-matches-guard` (new) | Early exits above the guard; a question whose two criteria disagreed. | Enclosing conditions and earlier early exits are sent; one-directional criteria; guards that share a message are one candidate. | first version 0/5; rewrite **not scored** |
+| `comment-gives-reason` | Reviewers do not want it. | Opt-in. Only a comment over one line, outside walkthroughs. | 1/9 in round 2, before the walkthrough filter |
+| `doc-matches-function`, one tag | A `@returns` that promises a value from a function that returns none. | Read from the syntax tree; a review. In two corpora 304 functions have the tag; one of them promises a value and returns none, and a reviewer had listed it. | the gold set (§26): 1 of 1 |
+| `error-message-matches-guard`, numeric limits | "Must be greater than 500ms" under `parsed >= 500`. Jev weighs boundaries badly, and its documentation says to keep arithmetic in code. | Jev classifies, code compares: a Choice reads which kind of limit the message states (at least, more than, at most, less than, not a limit), `boundary.ts` reads the condition's bound exactly, and code says whether they differ; "more than 19" and "at least 20" count as agreeing. Asked only when the condition is one comparison with a number and the message holds one number within 1 of it. `assert(check, "message")` is extracted as a guard. | **not scored**; a first version that read the message with patterns was withdrawn (§29) |
+
+**The comment-kind router is built.** It is the first construct from `docs/jev-conditionals.md`: one Choice
+(`explains_why`, `describes_behaviour`, `gives_example`, `labels_section`, `disabled_code`, `note_to_self`,
+`other`) that both comment rules read, asked once per comment because both rules send the same words. Each
+rule carries the probability of the kinds it applies to into its own result. It needed no engine change:
+the engine already sends candidates with identical words in one request and asks an identical question once.
+On the corpus it cut `comment-describes-code` reports from 276 to 176. It did not rescue the rule: in round 2
+the panel still called 1 of 13 errors and warnings right, because the remaining faults were in what the
+comment was paired with, not in what kind of comment it was.
+
+**Round 2** (93 items) scored the selection changes, the router, and the two new Jev rules, all on answers
+Jev had already given. Selection alone left overall precision where it was (9 of 43 errors and warnings
+right), and showed where the probabilities separate. For `function-name-matches-body` right reports had a
+mean of 0.85 and wrong ones 0.62; for the test rule every report from 0.88 up was right. The thresholds
+above come from that.
+
+**Round 3** (18 items) scored what the parser decides without Jev. `test-assertions-can-fail`: 4 of 5
+right, the fifth contested. `boolean-name-holds-boolean`: 1 of 1. The "returns nothing" fact: 1 of 2, and
+the wrong one was an Express handler that answers through `res`, which the extractor missed because it did
+not read an arrow function's parameters. It does now.
+
+**Where the default rules stand.** Scoring all three rounds' labels against the rules as they are now:
+
+| Rule | Errors and warnings | Review |
+| --- | --- | --- |
+| `function-name-matches-body` | 7 right, 1 contested, 0 wrong | 3 right, 1 contested, 4 wrong |
+| `test-title-matches-body` | 6 right, 3 contested, 1 wrong | no review band |
+| `doc-matches-function` | 1 right | 2 right, 1 wrong |
+| `test-assertions-can-fail` | 1 contested | 3 right |
+| `boolean-name-holds-boolean` | 1 right | |
+| all five | **15 right of 21 (71%), 1 called wrong by both labellers** | 8 right of 14 |
+
+One test was in round 1 twice and the two labellers agreed on it once and split once. It is counted as
+contested; counted as right, the total is 16.
+
+Read that table with three cautions. It is scored on the labels that the thresholds were chosen from, which
+flatters it (working rule 18). It is small. And it covers only what the cache can answer: the extractor now
+finds more functions (private methods, functions assigned to a name, plain comments above a function as
+documentation), so `function-name-matches-body` selects 415 candidates where 337 have an answer, and
+`doc-matches-function` 503 where 402 do. The honest test is a sample the rules have not seen, and there is
+none left in this corpus: every error and warning the default rules raise on the answered part has been
+labelled. That is why a second corpus exists (§28). What can be said plainly: the same 558 files that
+produced 1,235 reports, 21% of the loud ones right, now produce at least 40 and at most a few more once
+the unanswered candidates are classified, and both labellers call exactly one of the loud ones wrong.
+
+One of the five does not meet the bar the other four are held to. `test-assertions-can-fail` is in the
+default set because it reports what the parser can see for certain, not because a panel called its
+warnings right: the one it has, a test whose only assertion is `assert.ok(true)`, split the two labellers
+on whether it is worth raising. It is therefore a warning and not an error.
+
+## 26. Defects found by reading
+
+Precision says whether a report is right. It says nothing about what the rules never look at. So model
+reviewers (Opus and Fable agents following `scripts/panel/miner.md`) each read about 43 corpus files in
+full and listed every place where words and code disagree, without seeing a rule or a classification,
+until every file of both corpora had been read.
+Each listed defect then went to a verifier of the other model (`verifier.md`), who opened the file and
+confirmed or refuted it.
+
+| | Files read | Defects listed | Refuted by the verifier | Kept (one in each corpus left at "unsure") | Files with a defect |
+| --- | --- | --- | --- | --- | --- |
+| first corpus | 558 of 558 | 203 | 19 | 184 | 114 |
+| second corpus | 558 of 558 | 170 | 10 | 160 | 101 |
+
+About one file in five has one. In the first corpus, by what disagrees with the code:
+
+| What disagrees with the code | Kept | Example |
+| --- | --- | --- |
+| a comment | 59 | "Only the first 6 characters are considered" above a loop that reads 7 |
+| a test title, or assertions that cannot fail | 41 | `assert.ok(true)`; a title copied from the test above |
+| a doc block | 36 | a summary copied from the sibling function for the other kind of token |
+| a name | 19 | an `is…` variable that holds a string; `closeEvent` is a `change` event |
+| an error, log or assertion message | 18 | "must contain 3 or 4 parts" under `parts.length > 4` |
+| a translation | 6 | the key for flushing a database labelled "Database backup" |
+| an ignored error | 5 | `.catch(() => {})` on a pause that its neighbours report with an alert |
+
+`pnpm panel:recall` counts how many of these a classifying run reported within eight lines, by any rule,
+which is generous: a different rule firing nearby counts. The baseline of §24 reported 63 of the 184, 39 of
+them as an error or warning, at the price of 1,235 reports.
+
+**What the misses say** (from a reviewer's pass over the first 36, finding by finding):
+
+- **Most of the gap was in the extractor, not the wording.** 19 of 36 had no candidate at all: a private
+  method the query did not capture, a throw after an `if`/`else if` chain, a comment followed by a blank
+  line, a `.catch(() => {})`. Several of those shapes are captured now.
+- **Three were structural and no question finds them.** A test whose assertions all sit inside an `if`
+  checks exactly what its title says, when it checks anything. The parser sees the `if`; that is now
+  `test-assertions-can-fail`. A verifier later refuted two of those three (the guarded element always
+  exists in that test), which is why that finding is a review and not a warning.
+- **Some are out of reach and should stay there.** A success message sent after every send failed needs
+  control flow. A comment whose contradiction is 50 lines down, or in another method, is not a
+  self-contained candidate (working rule 19). Names that disagree with their value were 3 in about 250, a
+  base rate below what a literal reader can rank.
+- **Two new rules are worth a probe**, both self-contained: a locale entry's key against its text (6 kept;
+  but 1,793 candidates for them, and Jev on French and Turkish is untested), and a documented type against
+  its default and its description (2 kept).
+
+**The same defects are a gold set that costs nothing per change.** A reviewer who read a file in full and
+listed its defects has also said something about everything else in it: they read it and did not flag it.
+`pnpm panel:gold` takes each rule's candidates in the files reviewers read, marks a candidate positive when
+a kept defect of that rule's family sits on the candidate's own words (its doc comment and name, its title,
+its comment) and negative otherwise, and asks working rule 20's question as a number: the AUC, the chance
+that a positive has a higher probability than a negative. A panel round has to be drawn and labelled again
+after every change; this is recomputed in a second.
+
+On the first corpus, for the default rules as they stand (experimental ones have no answers yet):
+
+| Rule | Candidates | On a kept defect | AUC | Reported: on a defect / not |
+| --- | --- | --- | --- | --- |
+| `test-title-matches-body` | 1,216 | 37 | 0.76 | 4 / 6 |
+| `doc-matches-function` | 503 (403 answered) | 24 | 0.78 | 4 / 4 |
+| `function-name-matches-body` | 415 (337 answered) | 10 | 0.64 | 4 / 12 |
+| `test-assertions-can-fail` | 4 | 1 | | 1 / 3 |
+| `boolean-name-holds-boolean` | 1 | 1 | | 1 / 0 |
+
+This is the other half of §25, and it is not flattering. **The default rules are precise and they find
+little**: of 178 kept defects that some rule is meant for, 110 sit on a candidate, and the default rules
+report 14. Three things in that table matter for what comes next.
+
+- The test rule's question does rank: a real defect scores above an unflagged test 76 times in 100. Its
+  0.88 threshold then reports four of 37. The precision of §25 is bought by reporting only what Jev is
+  surest of, and the recall is lost at the threshold, not in the question.
+- The doc rule ranks as well and gave almost every real defect a probability under 0.30, so its question
+  reads a real contradiction as mild. Its reports on a defect come from the wide review band and from the
+  parser's `@returns` check.
+- The function rule ranks least (0.64, on ten positives), and of the sixteen candidates it reports here a
+  reviewer had listed four. The panel liked what it reports; a reader of whole files rarely lists a
+  misleading function name at all. Either the defect is rarer than the rule assumes, or reviewers reading
+  for contradictions do not look for it. This rule needs its `-next` rewrite measured before it earns more
+  trust.
+
+A lower threshold does not buy the recall back cheaply. For the test rule, counting candidates at or above
+each probability:
+
+| At or above | On a kept defect | Not |
+| --- | --- | --- |
+| 0.9 | 4 | 6 |
+| 0.8 | 7 | 13 |
+| 0.7 | 12 | 26 |
+| 0.6 | 16 | 50 |
+
+About a third of what it reports is something a reviewer had listed, at every threshold from 0.7 up: going
+from 0.9 to 0.7 finds three times the defects and three times the rest. That is a question that separates
+weakly and evenly, not one with a sharp edge that a better threshold would find. The panel said the same
+from the other side: between 0.80 and 0.88 it called most reports true and not worth raising.
+
+A negative here is "a reader did not flag it", not "it is fine", and the sets are small. They are not too
+rough to show where the recall is being lost, and they disagree with the panel in a useful way: of the 20
+items both panel labellers called right in files a reviewer had read, a reviewer had listed 7. A blind
+labeller shown a claim checks the claim; a reviewer reading a file lists what stood out. Both are evidence and neither is
+ground truth, so a rule should be asked to satisfy both.
+
+So the next live run is not only about the experimental rules. It decides whether the rewritten questions
+(`-next`) rank better than the ones they would replace, on this table, before any panel is drawn.
+
+The second corpus's set (160 kept defects, every one of its 558 files read) has not been used for anything
+and no one shaping a rule has read it: it is there so that recall and ranking can be measured once on defects no rule was
+shaped by.
+
+## 27. Questions reviewed before they are asked
+
+With no way to ask Jev (§28), two reviewers were given the rules, the live docs on writing questions, and
+the panel's disagreements, and asked what was still weak. One reviewed the wording, the other the
+candidates. What they found that reading the reports had not:
+
+- **Criteria that contradict each other.** `error-message-matches-guard` defined "consistent" on its `true`
+  side as "every value the condition rejects is one the message calls wrong", and its `false` side also
+  condemned "a limit the condition does not test". Both hold at once for `parts.length > 4` with "must
+  contain 3 or 4 parts", and for every message shared by two guards. The docs name this failure. The
+  question now tests one direction.
+- **A second defect inside one question.** `function-name-matches-body` had gained "or returns nothing at
+  all" on its `true` side, while its `false` side excused throwing: every `check…` that only throws
+  satisfied both. Returning nothing is now the parser's fact and not part of the question.
+- **Criteria that quoted the test set.** The test rule's rewrite cited "the title says nearest neighbour
+  and the test asserts cluster assignments", an item the panel had labelled, and a later check found three
+  more of the same kind in three rules (a status-code test, the "first 6 characters" comment, "ignore
+  ENOENT"). Scoring a rule on a sample that includes its own examples would overstate it. All of them are
+  invented ones now.
+- **A paraphrase multiplied by itself.** `contradicted × (1 − accurate)` asks nearly the same thing twice.
+  It costs nothing in precision and may add nothing; `scripts/criteria-experiment.ts` can settle it.
+- **A stale rationale.** A comment said a false match on the assertion pattern "costs a miss and never a
+  false report". The rule had since started using that fact the other way round, so a false match admits
+  a smoke test, which is the false positive the panel raised five times. The comment now says what is true.
+- **Option order.** Jev leans towards the first option of a Choice. The router lists the three kinds that
+  count as a claim first. Reversing the order on one run would show whether the boundary between a step
+  heading and a description is clear enough.
+
+None of the rewritten questions has been asked. They are what the next live run tests.
+
+## 28. What ran without Jev, and what is waiting for it
+
+The live run this section waits for happened on 2026-11-21, and §31 reports it.
+
+The API key comes from 1Password, which locked when the machine did, about fifteen minutes into this
+session. Everything after the 1.14 baseline and one run of the router and the two new rules happened
+without a single request. That shaped the work, and three things came out of it that are worth keeping.
+
+**A change to what a rule selects, or to its thresholds, needs no new answers.** Every classification it
+keeps was already made. `scripts/panel/reselect.ts` re-parses the corpus, runs each rule's `select`, and
+keeps a saved classification only when the rule still selects a candidate on the same line (and, with
+`--same-words`, only when it would send the same words). `--rethreshold` recomputes severities. That is
+exact for those changes, and it is how round 2 was drawn. `classify.ts --cache-only` does the same job
+when the words are unchanged.
+
+**Whatever the parser can decide can be shipped and scored without the model.** Round 3 was drawn entirely
+from findings Jev never saw.
+
+**A rule's default status should say what was measured.** A rule runs by default when a blind panel has
+called its errors and warnings right at its shipped thresholds, or when it reports only what the parser
+decides for certain. A rule whose question or candidate has been
+rewritten since is **experimental** and runs only when asked for (`--experimental`, `--rule`, or `"on"` in
+the config), however well motivated the rewrite. Seven rules are opt-in today: `comment-describes-code`,
+`swallowed-error-justified`, `error-message-matches-guard`, `test-title-matches-body-next`,
+`function-name-matches-body-next` and `doc-matches-function-next` are experimental, and
+`comment-gives-reason` is right about its claim and unwanted. The three `-next` rules are rewrites of a
+default rule that run beside it, so that one live run compares the two on the gold set of §26. The doc one
+exists because of that gold set: when it held 16 doc defects, every way of combining the stable rule's two
+answers ranked them the same (AUC 0.74 to 0.76), which says the fault is not in the arithmetic. Many of those defects
+are in what a `@param` or `@returns` tag says in words, and the stable rule sends only the summary.
+
+**Waiting for the key.** One process, so that one unlock is enough (`scripts/live-all.sh`):
+
+```sh
+pnpm exec varlock run -- sh scripts/live-all.sh
+#   every rule, experimental ones included, on corpus-code            → the 184 kept defects against the rewritten rules
+#   the same on corpus-code-2: 558 files from 64 other repositories   → the 160 kept defects nothing has been tuned against
+#   the gold-set table of §26 for both corpora: does each question rank a real defect above an unflagged candidate?
+#   the demo project with and without its config, and the author's fixtures
+pnpm panel:draw --round 4 --corpus corpus-code-2 --reported 14        # then the blind panel, on items no change here has seen
+```
+
+**What each rewrite has to beat.** The gold set of §26 also scores the versions the experimental rules
+replace, from answers already in the cache (`pnpm panel:gold --against corpus-code/classifications-v2.json`):
+
+| Rule, as it was before its rewrite | On a kept defect | AUC | Reported: on a defect / not |
+| --- | --- | --- | --- |
+| `comment-describes-code` (first paragraph only, "is it accurate") | 29 | 0.65 | 7 / 140 |
+| `error-message-matches-guard` (two-directional criteria, no context) | 7 | 0.91 | 4 / 17 |
+| `swallowed-error-justified` (the catch block alone) | 3 | 0.80 | 3 / 13 |
+| `test-title-matches-body` (the stable rule; `-next` is compared with it) | 37 | 0.76 | 4 / 6 |
+| `doc-matches-function` (the stable rule) | 24 | 0.78 | 4 / 4 |
+| `function-name-matches-body` (the stable rule) | 10 | 0.64 | 4 / 12 |
+
+A rewrite earns its place by ranking better than its row on the first corpus, and then by holding on the
+second, which it has never seen. The comment rule has the most to gain: 59 of the 184 kept defects are
+comments, it ranked them barely above chance, and it reported twenty unflagged comments for every flagged
+one. The guard rule's first version ranked its seven defects well, which the panel's 0 of 5 did not show:
+the panel saw only its five loudest reports. That is a caution against discarding a question on a panel
+round alone.
+
+Round 4 on the second corpus is the first honest number for the default rules and the first number of any
+kind for the experimental ones. An experimental rule that the panel calls right there joins the default
+set; one whose probabilities do not rank is removed (working rule 20).
+
+## 29. The work was reviewed the way the corpus was
+
+The changes of §24 to §28 were written in one sitting without a live run, so two more reviewers were set on
+the working tree before anything was claimed for it. One looked for defects and had to reproduce each with
+a concrete input. The other checked one thing: do the words (README, these findings, the catalogue, code
+comments) match the code?
+
+The first confirmed 17 defects. The ones that mattered:
+
+- A regular expression meant to recognise a function declaration also matched `if (x) {` and
+  `for (…) {`, so `comment-describes-code` dropped every comment above a conditional or a loop: most of
+  its candidates, silently. It is a tree check now.
+- `expect.assertions(1)` counted as an assertion made of constants, so Jest's documented pattern for an
+  async rejection was reported as a test that cannot fail.
+- A setter named `isOpen` was reported for returning nothing.
+- `--changed` saw no changes under `diff.mnemonicPrefix`, and none after a deletion: removing the one real
+  assertion from a test changed no line that the test's candidate could be matched to.
+- A suppression directive was matched anywhere in the source, a string included, and a rule list it could
+  not read (ids separated by spaces) widened to every rule.
+- Adding a convention to the config changed the fingerprint of every finding the rule had in the baseline.
+
+All 17 are fixed, each with a test that fails without the fix.
+
+The second found 25 places where words and code disagreed, among them: a README that counted eight rules
+where the code has eleven, a suppression example placed where it suppresses nothing (a finding is addressed
+at its declaration, not inside its body), a table in §25 that undercounted, and the three criteria examples
+of §27. Each is corrected.
+
+A second pass, on the fixes and on what was written after the first, confirmed 15 more. The worst were in
+the newest code, a check that compares a numeric limit in a message with the one in its condition and
+reports without asking Jev: it took the "cannot" of one clause for a negation of the limit in the next
+("Cannot create pool: size must be at least 1"), read "no bigger than" as "bigger than", and compared
+seconds with milliseconds. A finding raised with no model in the loop has nothing to soften it, so that
+check now says nothing whenever the message could be right in a way it cannot see. The same pass showed the
+gold-set scorer of §26 crediting one defect to several candidates. All 15 are fixed.
+
+A third pass on the code found 19 more, seven of them in that same check: "must never be more than 5",
+"Cannot be empty! Must be at least 3 items", "equal to or greater than", a negative number, a named
+"maximum of 100". Each fix to a pattern that reads prose had exposed the next sentence it misreads. That is
+the design decision this project started from (fuzzy matching of words is a meaning judgement, not code),
+arrived at again from the other side. The patterns are gone. The condition's bound is still read in code,
+because it is syntax; what the sentence asks for is now a classification by Jev, with a closed set of
+kinds, and code compares the two.
+
+A fourth, narrow pass on that redesign found five more (a finding whose message named a reading of the
+limit that agreed with the code, digits read out of `${MAX_ITEMS_V2}`), none of them a correct message
+reported as wrong. Four passes: 17, 15, 19, 5.
+
+A last pass over the words found 18 more places where they had drifted in the hour since the first: a rule
+added after the README was written, a finding called a warning that is reported as a review, two counts
+for the same ten test reports. It also recomputed every figure in §24 to §26 from the data, and they held.
+
+Two things to take from it. A linter for words that have drifted from code had, in its own working tree, a
+stale rationale, a misplaced doc comment, and a description that no longer fitted what the rule selected:
+the defect is as common as §26 says. And every one of these was found by a reader who was told to confirm
+before reporting, which is the same instruction that makes a labeller useful.
+
+## 30. Working rules for writing a Jev lint
 
 −1. Ask for the defect, not the virtue. "Is this specific enough?" has no boundary and a literal reader
    fails everything; "is this only filler?" is bounded. When one rule produces a uniform cluster of
@@ -1003,12 +1384,216 @@ dominate a rule.
     depends on run-time behaviour or on intent the input does not show, no wording will find it.
 20. Check that a rule's probabilities rank its reports before tuning its threshold. If right and wrong
     are interleaved at every score, remove the rule.
+21. Ask two things of every report: is it true, and would a reviewer want it said. "True and unwanted" is
+    the largest class of report, and no wording removes it: selection does (which names, which comments).
+22. Classify only the candidates for which the answer is a defect whichever way a convention goes. A name
+    that promises nothing (`init`, `bind`, `handle`) cannot break a promise.
+23. Before asking, check that the two sides of a criterion cannot both hold. Take a real candidate and read
+    it against each side on its own.
+24. A second defect inside a question ("…or returns nothing at all") is a second question, and often a
+    parser's fact.
+25. Never put an item from the labelled set in a criterion's examples. Invent one.
+26. Give a labeller the file, not the snippet. Half of what makes a report wrong is two screens away.
+27. Mark a rule by what was measured. A rewritten question is a new rule until it has been scored.
+28. When a pattern that reads prose needs a third fix, stop. It is a classification: give Jev the closed set
+    of kinds and let code compare the result with what code can read exactly.
+29. Have someone read real files for the defect before writing the rule for it. The base rate decides
+    whether the rule can live: 36 doc defects in 558 files is a rule; 6 mistranslations among 1,793 locale
+    entries is not one yet.
+
+## 31. The live run, and round 4 on a corpus nothing was tuned against
+
+On 2026-11-21 every rule ran live against `jev-1.14.0` on both corpora (`scripts/live-all.sh`), which
+answers what §28 left waiting. Round 4 then drew 163 items from the second corpus (558 files from 64
+repositories that no rule, threshold or question was shaped against) and one Opus and one Fable labeller
+labelled each item blind. The labellers agreed with each other on 148 of 163 items (91%).
+
+"Loud" below means reported as an error or a warning. "Right" means both labellers said the claim is true
+and worth raising in review.
+
+| Rule | Status | Loud reports right | Gold AUC, first / second corpus |
+| --- | --- | --- | --- |
+| `doc-matches-function` | default | 2 of 2 | 0.75 / 0.64 |
+| `function-name-matches-body` | default | 4 of 10 | 0.58 / 0.47 |
+| `test-title-matches-body` | default | 1 of 6 | 0.76 / 0.74 |
+| `doc-matches-function-next` | experimental | 5 of 12 | 0.82 / 0.80 |
+| `test-title-matches-body-next` | experimental | 3 of 10 | 0.75 / 0.76 |
+| `function-name-matches-body-next` | experimental | 2 of 13 | 0.57 / 0.27 |
+| `comment-describes-code` | experimental | 2 of 6 | 0.66 / 0.81 |
+| `swallowed-error-justified` | experimental | 6 of 13 | 0.64 / 0.58 |
+| `error-message-matches-guard` | experimental | 0 of 1 | 0.91 / 0.65 |
+| `comment-gives-reason` | opt-in | 0 of 9 | no positives |
+
+The gold AUC is the chance that a rule gives a defect that a reviewer found by reading a higher probability
+than a candidate with no such defect; 0.5 is a coin toss. The second corpus holds one positive for the two
+function-name rules and two for the guard rule, so those three AUCs say little.
+
+What this shows:
+
+- **The default rules do not hold their precision on unseen code.** Together they are right on 7 of 18
+  loud reports (39%). The 15 of 21 in §28 was scored on labels the thresholds were tuned against, and this
+  is the size of that flattery.
+- **No experimental rule earned promotion.** None is right on half of its loud reports.
+- **Being true is not the problem for the function-name rules; being worth raising is.** Both labellers
+  called the claim true and not worth raising on 4 of the 10 loud reports of the default rule and 9 of the
+  13 of the rewrite: a least-recently-used cache whose `get` updates recency, a documented get-or-assign,
+  vendored library code. The input holds the function, and what makes the side effect expected is in the
+  file or the project.
+- **`test-title-matches-body` at 0.88 and above is wrong, not unwanted.** Four of its five rejected loud
+  reports were called false by both labellers: the test does check what the title says, in a way the
+  question reads as something else (a constructor that throws, an assertion on rendered text).
+- **`doc-matches-function-next` ranks best and reports too readily.** Its AUC is 0.80 or above on both
+  corpora, and on the second it reports 14 of 28 doc defects found by reading against 6 for the default
+  rule. Its thresholds, not its question, are what a next round should move.
+- **`swallowed-error-justified` misses the fallback.** Four of its seven rejected loud reports have a
+  fallback after the handler, a flag that asks for suppression, or a comment above, which both labellers
+  read as the reason.
+
+Two rules were removed after this round. `function-name-matches-body-next` does not rank (AUC 0.57 and
+0.27) and was right on 2 of 13 loud reports. `comment-gives-reason` was right on 0 of 9 here and 1 of 26
+in the two rounds before: reviewers agree with its claim and do not want it raised.
+
+Two more left the default set. `function-name-matches-body` (4 of 10) and `test-title-matches-body` (1 of 6)
+are opt-in since this round, which leaves three default rules: `doc-matches-function` and the two that
+report only what the parser decides.
+
+Recall against the defects found by reading, every rule running: 49 of 184 on the first corpus (28 loud)
+and 35 of 160 on the second (29 loud). On the second corpus 52 defects sit where no rule looks.
+
+The second corpus is now seen: its panel labels and gold AUCs have been read, so a change made after this
+section needs a third corpus, or a new round on words not yet drawn, to be scored without flattery.
+
+## 32. Two more unseen corpora: one round cannot decide a rule
+
+Section 31 changed four rules and their status on one round of labels. Two more corpora were fetched to
+test that (seeds 3 and 4; repositories an earlier corpus had sampled were dropped, leaving 473 files from 55
+repositories and 496 files from 56). Each was classified live and labelled blind by one Opus and one Fable
+labeller, who agreed on 94% and 95% of items.
+
+Between rounds 4 and 5, four agents each reworked one rule against the round 4 notes:
+`swallowed-error-justified` now sends the enclosing function and has a fourth answer for an error that costs
+nothing to ignore; `doc-matches-function-next` first classifies whether the comment describes behaviour at
+all; `function-name-matches-body` asks a second question, whether the side effect serves the answer the name
+promises; `test-title-matches-body-next` asks its question in two wordings and reports where both agree.
+Between rounds 5 and 6 came four smaller changes from the round 5 notes: no swallowed-error candidates in
+test files or around `try { module.exports = X } catch {}`, no function-name candidates for a `calc…` or
+`check…` that returns nothing, and higher thresholds for the test-title rewrite and the guard rule.
+
+Errors and warnings a blind panel called right, per round, each on code the rule had not been tuned against:
+
+| Rule | Round 4 | Round 5 | Round 6 | Pooled |
+| --- | --- | --- | --- | --- |
+| `test-title-matches-body` | 1 of 6 | 12 of 16 | 1 of 7 | 14 of 29 (48%) |
+| `test-title-matches-body-next` | 3 of 10 | 11 of 19 | 0 of 1 | 14 of 30 (47%) |
+| `doc-matches-function-next` | 5 of 12 | 1 of 1 | 2 of 4 | 8 of 17 (47%) |
+| `doc-matches-function` | 2 of 2 | 0 of 2 | 0 of 1 | 2 of 5 |
+| `function-name-matches-body` | 4 of 10 | 0 of 2 | 1 of 2 | 5 of 14 (36%) |
+| `swallowed-error-justified` | 6 of 13 | 2 of 9 | 0 of 4 | 8 of 26 (31%) |
+| `comment-describes-code` | 2 of 6 | 0 of 2 | 0 of 5 | 2 of 13 (15%) |
+| `error-message-matches-guard` | 0 of 1 | 0 of 1 | none reported | 0 of 2 |
+| `boolean-name-holds-boolean` | none | 0 of 2 | 1 of 1 | 1 of 3 |
+
+All rules together: 56 of 161 errors and warnings right (35%), and 87 of 310 reports of any severity (28%).
+
+What this shows:
+
+- **A round of six to sixteen reports does not measure a rule.** `test-title-matches-body` went from 17% to
+  75% and back to 14% with no change to its question. Section 31 demoted it on the first of those numbers,
+  and promoted nothing on the same evidence; neither call was supported. A status change needs the pooled
+  count over several corpora.
+- **Fixes made from one round's notes did not carry to the next.** `swallowed-error-justified` reached 6 of 6
+  on the round 4 labels it was reworked against and then scored 2 of 9 and 0 of 4. Every fix was a real
+  reason from a labeller's note, and the next corpus brought different reasons.
+- **No rule that asks Jev reaches half.** The three best sit at 47 to 48%.
+- **The probability does not separate right from wrong.** In round 6 the mean probability of right and wrong
+  reports was 0.90 and 0.91 for `test-title-matches-body`, and 0.79 and 0.82 for the function-name rule.
+  A threshold cannot fix what the ranking does not hold.
+- **What decides a rejected report is outside what Jev was shown.** The notes name the same kinds of fact in
+  every round: an enclosing `describe` or a sibling function, what a framework does by default (a test
+  runner that fails a test on any uncaught exception), a documented contract a few lines up, a file that is
+  vendored or a fixture. Sending more of the file (the enclosing function, for swallowed errors) moved the
+  gold AUC on seen corpora from 0.64 to 0.86 and did not move precision on unseen ones.
+
+**What Jev does do is narrow.** Across the three corpora it classified 15,560 candidates in 1,527 files for
+about $0.55 and reported 532 of them. Of the reports the panel read, 28% were right; of the unreported
+candidates it read, drawn from just under the thresholds, 4 of 85 were. And the second reader is reliable:
+when one labeller called a report right, the other did so 85 to 89% of the time, working blind and
+independently. So the measured shape of a useful tool is two stages: Jev picks a few hundred places out of
+fifteen thousand, and a reasoning model that can open the file settles each. `docs/verify-findings.md` is
+that second stage as a prompt for a coding agent. It was not yet built into the CLI (§33 builds it). The 85 to 89% is agreement
+between blind labellers; an agent that is shown Jev's result first is measured below.
+
+**The second stage was then tried.** A Sonnet agent and a Haiku agent each followed
+`docs/verify-findings.md` over the 187 reports of rounds 5 and 6, seeing Jev's result, and what they kept
+was scored against the blind panel's labels:
+
+| Reader of the 187 reports | Kept | Kept and right by the panel | Of the panel's 57 right reports, kept |
+| --- | --- | --- | --- |
+| None: Jev's reports as they are | 187 | 57 (30%) | 57 |
+| Haiku | 75 | 53 (71%) | 53 (93%) |
+| Sonnet | 44 | 40 (91%) | 40 (70%) |
+
+So a second reader turns a list that is 30% right into one that is 71 to 91% right, and the cheaper model
+gives up precision for recall. The panel labellers were Opus and Fable, and the verifiers are models of the
+same family reading the same files, so this measures agreement with the panel, not with people.
+
+**A wider list buys little.** With a second reader, Jev's thresholds could be lower. On the second corpus,
+every candidate at 0.25 or above is 608 candidates against 103 at the rules' own thresholds
+(`--min-probability 0.25` does this; `gold.ts --curve` prints, per rule, how many defects found by reading
+each cut keeps). Sonnet agents read all 608 and kept 41: 30 of Jev's 103 reports and 11 from below the
+thresholds. Of the 41, 28 sit on a defect a reviewer had found by reading. Six times the reading bought
+about a third more findings. Two cautions: each agent was handed about 100 findings, and the two that kept
+fewest gave one shared sentence as the reason for every rejection, so a batch that size is probably skimmed;
+and the verifiers dropped 13 of the 33 reports that sit on a reviewer's defect, so a second reader loses
+real findings as well as noise.
+
+Rule status after these rounds is unchanged from §31, on purpose: no rule has pooled evidence for a place
+in the default set, and `doc-matches-function`, which stays there, has 2 of 5.
+
+## 33. The second stage, built in
+
+`--verify` is §32's second stage as part of the CLI (`src/engine/verify.ts`). After Jev's run it hands the
+findings, up to 20 at a time, to a reader and reports only those the reader calls true and worth raising.
+The reader is Claude Code run without a terminal (`src/engine/claude.ts`) with three read-only tools,
+because that is what §32 measured: an agent that can open the file and its siblings.
+
+**A reader with tools does not use them unless it has to.** The first version sent only the findings. A
+probe of one batch of 20 showed the reader answering all of them without opening a file, from the words Jev
+had already seen. Each batch now carries the 150 lines on either side of every finding, and the tools are
+for whatever the excerpt leaves out.
+
+**Two rules reporting the same code looked like duplicates to reject.** With the source in the prompt, a
+first run rejected findings with the reason that another rule had already raised the same test. The
+instructions now say a duplicate is decided on its own merits.
+
+Scored against the blind panel's labels for rounds 5 and 6, on the 159 of the 180 current findings the
+panel had labelled:
+
+| Reader | Findings with panel labels | Kept | Kept and right by the panel | Of the panel's 56 right findings, kept |
+| --- | --- | --- | --- | --- |
+| None | 159 | 159 | 56 (35%) | 56 |
+| `--verify` (Sonnet) | 159 | 53 | 45 (85%) | 45 (80%) |
+
+| Corpus | Findings | Kept | Kept, labelled | Right | Right ones kept |
+| --- | --- | --- | --- | --- | --- |
+| Third | 109 | 38 | 34 | 30 (88%) | 30 of 40 |
+| Fourth | 71 | 19 | 19 | 15 (79%) | 15 of 16 |
+
+Before the duplicate instruction the same runs gave 22 of 27 and 10 of 15, so the instruction was fitted to
+these corpora and the 85% is not from unseen data. It is also one run of each: the fourth corpus kept 15 on
+one run and 19 on the next. The wider list of §32 has not been tried through `--verify`. Verdicts are
+cached per finding and file source; a verdict that turned on another file does not see that file change.
 
 ## Open questions
 
+- `--verify` on a corpus fetched after it was written, and against human labels rather than the panel's.
+
 - A labelled set from real sites, written by someone other than the prompt author, to get honest precision.
-- Inline suppression comments and a baseline file, which any real linter needs.
-- User-defined rules from a config file: `{ select, ask, failWhen, threshold }`. This is the most novel use,
-  and nothing found here blocks it.
+- Inline suppression (`jev-lint-disable-next-line`), `--changed` / `--since`, and a baseline file
+  (`--write-baseline`, `--baseline`) are built. None has met a real project yet.
+- User-defined rules are built as one yes/no classification over what the parser already extracts
+  (`custom` in the config). Not yet: a Choice, more than one question, or a custom extraction.
+- The human label bench against the panel on the same items, on more than 14 labels: how much stricter is
+  the panel, and on which rules?
 - Adversarial content. State is not treated as hostile, so linting untrusted HTML could be steered.
   That is acceptable for linting your own code and not for gating third-party content.

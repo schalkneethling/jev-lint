@@ -34,3 +34,10 @@ export async function fetchWithRetry(url: string, attempts = 3): Promise<Respons
   }
   throw new Error("unreachable");
 }
+
+let cachedTimezones: string[] | undefined;
+
+export function getTimezones(): string[] {
+  cachedTimezones ??= Intl.supportedValuesOf("timeZone");
+  return cachedTimezones;
+}

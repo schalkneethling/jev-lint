@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { noul } from "@typesafe-ai/sdk";
 import { parseCode } from "../src/code/parse.ts";
 import type { Ask } from "../src/engine/client.ts";
 import { run } from "../src/engine/run.ts";
+import { defineCodeRule } from "../src/engine/types.ts";
 import commentDescribesCode from "../src/rules/code/comment-describes-code.ts";
-import commentGivesReason from "../src/rules/code/comment-gives-reason.ts";
+import { commentKind } from "../src/rules/code/comment-kind.ts";
 import { commentCandidates } from "../src/rules/code/shared.ts";
 
 const source = `
@@ -95,18 +97,34 @@ test("rules that classify the same words share one request", async () => {
   const ask: Ask = async (_state, questions) => {
     seen.push(Object.keys(questions));
     return {
-      answers: Object.fromEntries(Object.keys(questions).map((id) => [id, { type: "noul" as const, noul: 0.5 }])),
+      answers: Object.fromEntries(
+        Object.entries(questions).map(([id, question]) => [
+          id,
+          question.type === "choice"
+            ? { type: "choice" as const, choice: "describes_behaviour", confidence: 1, probabilities: { describes_behaviour: 1 } }
+            : { type: "noul" as const, noul: 0.5 },
+        ]),
+      ),
       usage: { input_tokens: 1, output_tokens: 1 },
     };
   };
+  // A second rule over the same comments that reads the same router question.
+  const secondReader = defineCodeRule({
+    id: "second-reader",
+    description: "A rule that exists only in this test.",
+    select: commentCandidates,
+    questions: (ref) => ({ kind: commentKind(ref), only_restates: noul(`Does ${ref("comment")} only restate ${ref("code")}?`) }),
+    assess: ({ only_restates }) => ({ p: only_restates.noul, message: "restates" }),
+  });
   const { classifications } = await run([{ path: "sample.ts", source }], {
-    rules: [commentDescribesCode, commentGivesReason],
+    rules: [commentDescribesCode, secondReader],
     ask,
     isolation: "candidate",
   });
   assert.equal(seen.length, 1);
-  assert.equal(seen[0]!.length, 3);
-  assert.deepEqual(classifications.map((j) => Object.keys(j.answers)), [["describes_behaviour", "accurate"], ["only_restates"]]);
+  // Both rules read the comment-kind router, and it is asked once: four questions, not five.
+  assert.equal(seen[0]!.length, 4);
+  assert.deepEqual(classifications.map((j) => Object.keys(j.answers)), [["kind", "contradicted", "accurate"], ["kind", "only_restates"]]);
 });
 
 test("an empty catch is found with the comment inside it; a catch that does something is not", async () => {
@@ -121,7 +139,7 @@ test("an empty catch is found with the comment inside it; a catch that does some
 
 test("function-name-matches-body leaves out functions named for when they run", async () => {
   const { default: rule } = await import("../src/rules/code/function-name-matches-body.ts");
-  const doc = await parseCode("f.ts", `function onEnd() {} function handleClick() {} class A { attributeChangedCallback() {} getUser() {} }`);
+  const doc = await parseCode("f.ts", `function onEnd() { save(); } function handleClick() { save(); } class A { attributeChangedCallback() { save(); } getUser() { return load(); } }`);
   assert.deepEqual(rule.select(doc).map((c) => c.data.name), ["getUser"]);
 });
 

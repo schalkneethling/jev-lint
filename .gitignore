@@ -5,9 +5,12 @@ node_modules/
 # files quote other people's pages (the axe report alone is ~50 MB) and are rebuilt from the seed.
 corpus*/snapshots/
 corpus*/classifications*.json
+corpus*/dev-*.json
 corpus*/axe-report.json
 corpus*/label-sample.json
 corpus*/label-sample-blind.json
 corpus*/label-items/
 corpus*/labels/
 corpus*/rounds/
+# Logs of scripts/live-all.sh: they quote corpus code.
+live-logs/

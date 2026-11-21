@@ -13,7 +13,12 @@ Every rule has the same shape:
 Status: **built** (in `src/rules`, measured in [findings.md](findings.md)) · **probed** (passed a small live
 probe in `scripts/probe-css-js.ts` or `scripts/probe-aria.ts`) · **idea** (untested) · **poor fit** (do not build).
 
-Risk refers to [Jev 1.13 jaggedness](https://docs.typesafe.ai/model-jaggedness/jev-1.13).
+Risk refers to [Jev's documented jaggedness](https://docs.typesafe.ai/model-jaggedness). Rules are tuned against `jev-1.14.0`.
+
+A built JS/TS rule is **default** when a blind panel has called its errors and warnings right at its shipped
+thresholds on code it was not tuned against, or it reports only what the parser decides. Every other built
+rule is **opt-in**: the panel called fewer than half of its errors and warnings right (findings §31).
+"Experimental" marks an opt-in rule that is a rewrite still being worked on.
 
 ## HTML
 
@@ -107,24 +112,32 @@ handles well.
 
 | Rule | Catches | Code extracts | Jev classifies | Code decides | Status |
 | --- | --- | --- | --- | --- | --- |
-| `function-name-matches-body` | `getUser` that deletes, `isValid` that sends email | name, body (truncated) | Noul: would a caller who read only the name be surprised by a side effect | low p reports | built |
-| `comment-describes-code` | stale comments | comment and the statement below it; directives, API docs, and file headers skipped in code | two Nouls: does the comment describe an operation; does the code do it | p = describes × (1 − accurate) | built |
-| `comment-gives-reason` | comments that restate the code instead of saying why | same candidate, so it shares the request | Noul | high p reports; never an error | built |
-| `test-title-matches-body` | `it("throws when…")` with no throw assertion | title and callback of `it` / `test` calls | Noul | low p reports | built |
+| `function-name-matches-body` | `getUser` that deletes, `isReady` that loads and returns nothing | name and body, only for names that promise an answer (`get…`, `is…`, `parse…`), outside test files and object literals; a body that cannot act is skipped; "returns no value" is the parser's fact | two Nouls: would a caller who read only the name be surprised by a side effect; does the body change something that outlives the call, apart from producing its answer | p = √(surprised × own consequence), and the first answer alone for a function that returns nothing; p ≥ 0.8 warns; a name that promises a value and returns none is held at review at least; a `calc…` or `check…` that returns nothing is skipped; a prefix most of whose functions are reported becomes one house-style finding | built; opt-in (5 of 14 right over rounds 4 to 6) |
+| `comment-describes-code` | stale comments | comment and the section it heads (to the next comment, or the whole body when it opens one); directives, API docs, commented-out code, comments above declarations, and unparsed code skipped in code | the `comment-kind` Choice; two Nouls: is something specific contradicted; does the code do what it says | p = P(makes a claim) × contradicted × (1 − accurate) | built; experimental (the earlier version: 2 of 26 right) |
+| `test-title-matches-body` | a title copied from another test; a title whose behaviour no assertion touches | title and callback of `it` / `test` calls that hold an assertion; hooks skipped | Noul: do the assertions check what the title claims | reports only from p ≥ 0.88 | built; opt-in (14 of 29 right over rounds 4 to 6) |
 | `error-message-actionable` | "Something went wrong", raw error codes, blaming tone | string literals in `throw`, toast, and alert calls | Noul, or a Score from cryptic to actionable | low p reports | probed 5/5 |
 | `ui-string-style-guide` | strings that break the team's voice and tone guide | user-facing strings; the guide in the criteria | one Noul per guideline | per team | idea |
 | `boolean-name-polarity` | `const disabled = isEnabled(user)` | name, initialiser | Noul: does the name mean the same as the expression, not its opposite | low p reports | idea; risk: negation and indirection |
-| `swallowed-error-justified` | an empty `catch` whose comment is "// ignore" | the parser finds empty catch blocks; no comment at all is decided in code | Noul: does the comment give a reason why ignoring is safe | low p reports | built; fixtures only |
+| `swallowed-error-justified` | an empty `catch` or `.catch(() => {})` with nothing nearby showing why it is safe | the handler's comment, the code that can fail, the statements around it, and the enclosing function or test; skipped: a `try` that assigns an outer variable (it keeps its fallback), test files, and `try { module.exports = … } catch {}` | Choice: reason stated / evident from code / costs nothing / nothing | p = P(nothing) | built; experimental (8 of 26 right over rounds 4 to 6) |
+| `test-title-matches-body-next` | the same as `test-title-matches-body` | also the enclosing `describe` titles | two Nouls and a Choice: does the title name an outcome at all; do the assertions check something else; how the test relates to its title (checks it / different subject / too weak / opposite / no claim) | p = names outcome × √(checks something else × (different subject + too weak)); warns from 0.8 | built; experimental (14 of 30 right over rounds 4 to 6) |
+| `doc-matches-function-next` | the same as `doc-matches-function`, and a `@param` or `@returns` description at odds with the code | the whole doc comment, the parameter list, name, body | Noul: is something specific contradicted; Choice: does the comment describe behaviour, explain, or neither; code: a `@param` that names a parameter the function does not take | p = contradicted × P(describes), raised when a documented parameter does not exist; warns from 0.8, reviews from 0.5; licence headers and bodies that only return a constant are skipped | built; experimental (8 of 17 right over rounds 4 to 6) |
+| `doc-matches-function` | a doc comment copied from a sibling function, or left behind when the body changed | the comment directly above a function, JSDoc or not (its prose before the first tag), name, body; stubs, notes, and "use X instead" summaries skipped | two Nouls: is something specific contradicted; is the summary accurate | p = contradicted × (1 − accurate) | built; default (7 reports among the 410 functions with a JSDoc block; plain comments above functions not yet classified) |
+| `error-message-matches-guard` | `if (!user.email) throw new Error("name is required")`; "Must be greater than 500" under `x >= 500` | an `if` whose only consequence is a throw with a literal message, or an `assert(check, "message")`; guards of one function sharing a message joined; enclosing conditions and earlier early exits sent as what must hold; the condition's numeric bound read in code and withheld | two Nouls: does the message state a requirement; does the condition contradict it. A Choice, where code has a bound: which kind of limit the message states | p = the larger of requirement × contradicts and the probability of a limit that differs from the code's | built; experimental (the first version: 0 of 5 right by a panel, AUC 0.91 on seven defects) |
+| `test-assertions-can-fail` | `assert.ok(true)`; every assertion inside an `if` | assertion statements read from the tree | nothing | constant assertions are a warning, all-conditional ones a review | built; default; code only |
+| `boolean-name-holds-boolean` | `const isBot = id ? user.jid : ""` | variables named `is…`/`has…`/`should…`/`can…`/`was…`/`did…` whose value is a literal string, number, object, array, or a conditional with such a branch | nothing | reported from code | built; default; code only |
+| `locale-entry-matches-key` | `flushdb: "Database backup"` in a translation file | one key and value from an object literal in a locale file | Choice: same meaning / different meaning / name too vague | p = P(different meaning) | idea; 6 real cases among the 184 kept defects of findings §26, 1,793 candidates |
+| `documented-type-matches-default` | `@property {boolean} [clonesMin] Minimum number of clones` with default `0` | a documented type, its description, and the default value | code compares type with default; Choice on how many kinds of value the description names | per case | idea; 2 real cases |
 | `todo-quality` | `// TODO fix` with no owner, reason, or condition | comment text | Noul against the team's TODO convention | per team | idea |
 | `log-may-leak-sensitive` | `console.log(user.password)` | identifiers and property names passed to log calls | Noul per identifier: does this name suggest a secret or personal data | high p reports | idea |
 | `jsdoc-param-meaning` | `@param userId` described as "the user's email" | param name, description | Noul | low p reports | idea |
 
 ## Cross-language and team conventions
 
-- **User-defined rules.** `{ id, select, ask, failWhen, threshold }` in a config file, where `ask` is a
-  convention in plain language: "Does this component name describe what it renders, not where it is used?"
-  This is what TypeSafe's use-case map describes, and no existing linter offers it. The spike's rule
-  contract already supports it; what is missing is a selector syntax for `select`.
+- **User-defined rules.** Built: `{ id, on, ask, criteria, reportWhen, message, thresholds, where }` under
+  `custom` in a config file, where `ask` is a convention in plain language ("Does this test title name the
+  behaviour being tested?") and `on` picks what the parser already extracts: functions, comments, tests,
+  guards, or ignored errors. This is what TypeSafe's use-case map describes, and no existing linter offers
+  it. Not built: a Choice, more than one question per rule, or an extraction of the user's own.
 - **Hook names vs behaviour.** `data-*` attributes and `js-*` classes whose names promise one behaviour while
   the handler bound to them does another. Needs cross-file extraction in code first.
 - **Docs vs code.** README examples and option tables that contradict the actual option names and defaults.

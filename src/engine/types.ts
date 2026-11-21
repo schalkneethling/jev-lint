@@ -7,6 +7,11 @@ export interface Loc {
   col: number;
   /** Character offsets of the source text to quote in a report, such as an element's start tag. */
   span?: { start: number; end: number };
+  /**
+   * Every line the candidate's words come from: a whole function, a comment and the code under it. A finding
+   * is reported at `line`, but a change anywhere in `lines` can make it true, which is what `--changed` needs.
+   */
+  lines?: { first: number; last: number };
   /** Indexes into the page's axe results for this element, when an axe report was supplied. */
   axe?: number[];
   /** The third-party widget this element belongs to, which the page's author cannot edit. */
@@ -66,6 +71,18 @@ export interface Rule<Q extends RuleQuestions = RuleQuestions, D = HtmlDoc> {
   target: Target;
   description: string;
   thresholds?: Partial<Thresholds>;
+  /**
+   * Set on a rule that does not run unless asked for: by `--experimental`, by `--rule`, or by a config file.
+   * A rule is opt-in until a blind panel, on code it was not tuned against, calls at least half of its errors
+   * and warnings right.
+   */
+  optIn?: boolean;
+  /**
+   * Set on a rule whose answer a house style can change. When the project's config lists conventions, the
+   * engine adds them to each of the rule's candidates as `project_conventions`, and the rule's question
+   * says how to weigh them. Without conventions the candidate, and so its cached answer, is unchanged.
+   */
+  readsConventions?: boolean;
   /** Deterministic extraction. Anything a parser can decide is decided here. */
   select(doc: D): Candidate[];
   /**
@@ -75,6 +92,13 @@ export interface Rule<Q extends RuleQuestions = RuleQuestions, D = HtmlDoc> {
   questions(ref: Ref, candidate: Candidate): Q;
   /** Combines the independent answers, and any withheld facts, into one violation probability. */
   assess(answers: AnswersFor<Q>, candidate: Candidate): Assessment;
+  /**
+   * Looks at all of the rule's classifications in one run together, and may restate some of them. This is
+   * where a fact that no single candidate holds is derived: when most functions that share a naming pattern
+   * are classified the same way, that is a house style, and it is one finding to review, not one per function.
+   * It asks Jev nothing. Return an assessment per classification, in the same order.
+   */
+  reconcile?(classified: { candidate: Candidate; file: string; assessment: Assessment }[]): Assessment[];
 }
 
 /** A rule with its question type erased, so rules of different shapes fit in one list. */
@@ -116,6 +140,14 @@ export interface Classification extends Assessment {
   severity: Severity | null;
 }
 
+/** A second reader opened the file and agreed with the finding (`verify.ts`). */
+export interface Confirmation {
+  /** The model that read the file. */
+  by: string;
+  /** The code that decided it, in the reader's words. */
+  reason: string;
+}
+
 /**
  * A flag alone moves nobody. A finding carries what was checked and why it was reported, so a person
  * or a coding agent can act on it without re-deriving the classification. Fixing it is out of scope.
@@ -137,6 +169,8 @@ export interface Finding extends Assessment {
   axe?: { rule: string; outcome: "passed" | "failed"; help: string; checksSameThing: boolean }[];
   /** Every element a repeated pattern was found on, the first included. Set only on a merged finding. */
   occurrences?: { loc: Loc; snippet?: string; checked: Candidate["data"] }[];
+  /** Set by `--verify` on a finding the second reader kept. */
+  confirmed?: Confirmation;
 }
 
 export interface RunStats {
@@ -146,4 +180,10 @@ export interface RunStats {
   inputTokens: number;
   /** Candidates left unclassified in cache-only mode because an answer they need was never asked. */
   unanswered: number;
+  /** Findings switched off by a `jev-lint-disable` comment in the source. */
+  suppressed: number;
+  /** Candidates not classified because `--changed` was given and none of their lines changed. */
+  unchanged: number;
+  /** Findings left out because the baseline file already records them. */
+  baselined: number;
 }

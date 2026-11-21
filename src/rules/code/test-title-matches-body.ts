@@ -6,10 +6,22 @@ export default defineCodeRule({
   id: "test-title-matches-body",
   description: "A test should check what its title claims.",
   // Real tests often assert through helpers and mapped values, which takes reasoning to connect to the
-  // title. Those land between 0.55 and 0.75; tests that assert something else entirely land above 0.9.
-  thresholds: { error: 0.95, warn: 0.88, review: 0.8 },
+  // title. Below 0.88 two blind panels called most reports wrong (smoke tests, thin assertions that still
+  // touch the named behaviour). Of the ten reports the rule still makes at 0.88 and above, they called six
+  // right, three contested and one wrong (one test was labelled twice, once agreed and once split; it counts as split). So there is no review band.
+  //
+  // Opt-in since a third panel, on code this threshold was not tuned against (findings §31), called 1 of 6
+  // reports right. Both labellers called four of the other five false: the test checks what its title says
+  // in a way the question does not recognise (a constructor that must not throw, an assertion on rendered text).
+  optIn: true,
+  thresholds: { error: 0.95, warn: 0.88, review: 0.88 },
 
-  select: (doc) => doc.tests.map((test) => ({ loc: test.loc, data: { title: test.title, body: clip(test.body) } })),
+  select: (doc) =>
+    doc.tests
+      // A test with no assertion is a smoke test: it claims only that the code runs. Whether that is enough
+      // is a team's policy and a parser's job (jest/expect-expect), not a question about the title.
+      .filter((test) => test.hasAssertion)
+      .map((test) => ({ loc: test.loc, data: { title: test.title, body: clip(test.body) } })),
 
   questions: (ref) => ({
     // No criteria: the boundary is plain, and removing them changed nothing (scripts/criteria-experiment.ts).

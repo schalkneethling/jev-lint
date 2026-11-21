@@ -6,7 +6,7 @@ import functionNameMatchesBody from "../src/rules/code/function-name-matches-bod
 import alertIsUrgent from "../src/rules/html/alert-is-urgent.ts";
 import { limits, withLimit } from "../src/rules/limits.ts";
 
-const longFunction = (chars: number) => `function collectTotals(rows) {\n  let total = 0;\n  // ${"x".repeat(chars)}\n  return total;\n}\n`;
+const longFunction = (chars: number) => `function getTotals(rows) {\n  let total = sum(rows);\n  // ${"x".repeat(chars)}\n  return total;\n}\n`;
 const longAlert = (count: number) => `<p role="alert">${Array.from({ length: count }, (_, i) => `word${i}`).join(" ")}</p>`;
 const field = (candidates: { data: { [key: string]: unknown } }[], name: string) => String(candidates[0]!.data[name]);
 

@@ -1,7 +1,9 @@
 # Jev as a conditional
 
-Status: **proposal**. Nothing here is built. It sketches how a classification can decide what the linter
-does next, and what has to be true so that a wrong branch is never silent.
+Status: **partly built** (2026-11-20). The comment router is built, in a simpler form than sketched here
+(see "What was built" at the end). The `select` predicate and `widen` are still proposals. This document
+sketches how a classification can decide what the linter does next, and what has to be true so that a wrong
+branch is never silent.
 
 ## Why
 
@@ -31,8 +33,8 @@ its first lines" does.
 
 ### 1. A router: one shared classification, read by several rules
 
-`comment-describes-code` carries its own gate today (`describes_behaviour`), `comment-gives-reason` asks what
-is nearly its inverse (`only_restates`), and a regex of first words filters out directives, TODOs and licence
+When this was proposed, `comment-describes-code` carried its own gate (`describes_behaviour`), `comment-gives-reason` (removed since, findings §31) asked what
+was nearly its inverse (`only_restates`), and a regex of first words filtered out directives, TODOs and licence
 headers before either. One Choice can serve all three purposes, and any later comment rule.
 
 ```ts
@@ -140,3 +142,30 @@ corpus supplies candidates by the thousand, and the label bench can score the ro
 exercises the soft, shared-state path. `widen` comes second, on `function-name-matches-body`, where the 6,000
 character clip is the known pressure point. The `select` predicate comes last: it is the only hard branch,
 and it should wait until a router has shown that its probabilities rank.
+
+## What was built
+
+**The comment router** is `src/rules/code/comment-kind.ts`: one Choice with seven kinds, read by
+`comment-describes-code` and, until it was removed (findings §31), `comment-gives-reason`. It did not need `defineRouter`, `Rule.route`, or a
+third argument to `assess`. A router is a question that two rules both include:
+
+```ts
+// comment-describes-code.ts does this, and any later comment rule can
+questions: (ref) => ({ kind: commentKind(ref), /* the rule's own questions */ }),
+assess: ({ kind, contradicted, accurate }) => ({ p: makesAClaim(kind) * contradicted.noul * (1 - accurate.noul), … }),
+```
+
+The engine already puts candidates with identical words in one request and asks an identical question
+once, so the router costs one question per comment however many rules read it. The branch is soft, typed
+(`kind.probabilities.describes_behavior` is a compile error), and visible: `kind` is listed with the
+finding's other measurements. What it does not have yet is rule 4 above: its own rows in a label bench.
+
+**Two things that turned out to be conditionals without Jev.** A rule's `reconcile` step looks at all of its
+classifications in a run and restates them (`function-name-matches-body` turns a prefix most of whose
+functions are reported into one house-style finding). And a parser fact can set a floor under Jev's answer
+(`assess` holds a function named for an answer that returns none at review at least). Both are branches on
+evidence the candidate does not hold, decided in code, recorded on the finding.
+
+**Measured effect of the router**: reports of `comment-describes-code` on the code corpus fell from 276 to
+176. A blind panel still called 1 of 13 right, because the fault was in what the comment was paired with.
+A router narrows what is asked; it does not repair the candidate.

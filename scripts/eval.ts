@@ -13,7 +13,9 @@ const isolations = (values.isolation ?? ["candidate", "rule", "file"]) as Isolat
 
 const ask = createAsk();
 const cache = new AnswerCache(".jev-lint-cache");
-const read = (dir: string) => globSync(`${dir}/**/*.{html,ts,js}`).sort().map((path) => ({ path, source: readFileSync(path, "utf8") }));
+// Named without the leading `fixtures/`: a rule that skips test files and fixture directories, as
+// `function-name-matches-body` does, would otherwise skip every fixture written for it.
+const read = (dir: string) => globSync(`${dir}/**/*.{html,ts,js}`).sort().map((path) => ({ path: path.replace(/^fixtures\//, ""), source: readFileSync(path, "utf8") }));
 const mean = (js: Classification[]) => (js.reduce((sum, j) => sum + j.p, 0) / (js.length || 1)).toFixed(2);
 
 const rows: Record<string, string | number>[] = [];

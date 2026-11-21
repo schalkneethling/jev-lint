@@ -53,7 +53,7 @@ test("identical candidates are sent once per run", async () => {
   assert.equal(requests.length, 2);
   // No heading sits above these links, so only the filler question is asked; the repeated
   // "click here" link reuses its answer.
-  assert.deepEqual(stats, { requests: 2, questions: 3, cacheHits: 1, inputTokens: 200, unanswered: 0 });
+  assert.deepEqual(stats, { requests: 2, questions: 3, cacheHits: 1, inputTokens: 200, unanswered: 0, suppressed: 0, unchanged: 0, baselined: 0 });
 });
 
 test("a second run is answered entirely from the cache", async () => {

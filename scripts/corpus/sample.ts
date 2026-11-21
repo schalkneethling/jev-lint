@@ -11,6 +11,7 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { allRules, htmlRules } from "../../src/rules/index.ts";
+import { claimOf } from "./claims.ts";
 import { readCorpus } from "./corpus.ts";
 
 const { values } = parseArgs({
@@ -90,23 +91,6 @@ for (const rule of rules) {
   sample.push(...takenReported, ...nearThreshold, ...random);
 }
 
-// What the labeller is asked to confirm must read the same whether or not the tool agreed. Most rules'
-// messages already do. label-input-type's names the model's reading of the label, which for an
-// unreported item came out as 'asks for an email value, but the input is type="email"': two labellers'
-// worth of "true" for a claim nobody made. So its claim is stated from the facts alone.
-const CLAIMS: Record<string, (j: Saved) => string> = {
-  "label-input-type": (j) => `Field "${j.checked.label ?? j.checked.placeholder}" has type="${j.facts.type}", and that type does not suit what the field asks for.`,
-  // The rule's own message ends "Say why, or remove it", which is advice to an author rather than something
-  // a labeller can call true or false. Stated as the claim the label is actually about.
-  "comment-gives-reason": (j) => `Comment "${j.checked.comment}" only restates what the code below it already says.`,
-  // Two messages, one for a catch block holding a comment and one for a catch block holding nothing, would
-  // tell a labeller which of the two the tool decided in code. One wording, stated from the facts, for both.
-  "swallowed-error-justified": (j) =>
-    j.checked.comment_in_empty_catch
-      ? `Nothing in this catch block says why ignoring the error is safe: its only comment is "${j.checked.comment_in_empty_catch}".`
-      : "Nothing in this catch block says why ignoring the error is safe: it holds no comment at all.",
-};
-
 const ordered = shuffled(sample);
 const description = new Map(allRules.map((rule) => [rule.id, rule.description]));
 writeFileSync(`${values.corpus}/label-sample.json`, JSON.stringify(ordered, null, 1));
@@ -115,7 +99,7 @@ const itemsDir = `${values.corpus}/label-items`;
 rmSync(itemsDir, { recursive: true, force: true });
 mkdirSync(itemsDir, { recursive: true });
 const items = ordered.map((j, n) => {
-  const item = { id: `j${j.id}`, n, rule: j.rule, ruleDescription: description.get(j.rule), claim: CLAIMS[j.rule]?.(j) ?? j.message, hint: j.hint ?? "", snippet: j.snippet, checked: j.checked, facts: j.facts, page: j.page, kind: j.kind, band: j.band };
+  const item = { id: `j${j.id}`, n, rule: j.rule, ruleDescription: description.get(j.rule), claim: claimOf(j), hint: j.hint ?? "", snippet: j.snippet, checked: j.checked, facts: j.facts, page: j.page, kind: j.kind, band: j.band };
   writeFileSync(`${itemsDir}/${item.id}.json`, JSON.stringify(item));
   return item;
 });
