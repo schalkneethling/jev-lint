@@ -31,7 +31,7 @@ Jev's findings ──► batches of up to 20 ──► reader ──► true and
   reported as Jev left it and the summary counts it as not verified.
 - **Verdicts are cached** in `.jev-lint-cache/verdicts`, keyed by the finding and its file's source. A verdict
   that turned on a different file does not notice that file changing; `--no-cache` asks again.
-- `--verify-model haiku` uses the cheaper reader, which keeps more findings and is right less often.
+- `--verify-model haiku`, with or without `--verify` beside it, uses the cheaper reader. Through `--verify` it scored as well as Sonnet (see below).
 - The exit status is 1 only when a finding that is still reported is an error.
 
 ## By hand: your own coding agent
@@ -61,8 +61,13 @@ what it kept was scored against the blind panel's labels for the 159 findings th
 | --- | --- | --- | --- | --- |
 | None | 159 | 159 | 56 (35%) | 56 |
 | `--verify` (Sonnet) | 159 | 53 | 45 (85%) | 45 (80%) |
+| `--verify --verify-model haiku`, first run | 159 | 61 | 50 (82%) | 50 (89%) |
+| `--verify --verify-model haiku`, second run | 159 | 56 | 48 (86%) | 48 (86%) |
 
-It took about a minute per corpus and Claude Code put the cost at about $2 for both. Read the 85% with two
+The Sonnet run took about a minute per corpus and Claude Code put its cost at about $2 for both. Each Haiku
+run cost between $0.05 and $0.13 for both. On these corpora Haiku was right as often as Sonnet and kept more
+of the right findings, which is not what the by-hand trial below found, where the Haiku agent was right on
+71%. The difference between the two set-ups is that `--verify` puts the source in the prompt. Read the 85% with two
 cautions. The instruction that a duplicate finding is decided on its own merits was added after a first run
 on these same corpora showed the reader rejecting duplicates, so the number is not from unseen data. And
 it is one run: a first run of the fourth corpus kept 15 and a second kept 19.

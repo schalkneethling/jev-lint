@@ -91,7 +91,8 @@ pnpm lint path/to/project --since origin/main  # only what changed since the bra
 pnpm lint path/to/project --since origin/main --format github   # annotations on the pull request, from a GitHub Actions job
 pnpm lint path/to/project --experimental       # also run the opt-in rules
 pnpm lint path/to/project --min-probability 0.3 # a longer list, for a second reader to confirm
-pnpm lint path/to/project --verify             # keep only what a second reader confirms after reading the file
+pnpm lint path/to/project --verify             # keep only what a second reader (Sonnet) confirms after reading the file
+pnpm lint path/to/project --verify-model haiku # the same with Haiku as the reader, for about a twentieth of the cost
 pnpm lint path/to/project --baseline jev-lint-baseline.json   # only findings the baseline does not record
 ```
 
@@ -149,13 +150,14 @@ pnpm lint path/to/project --experimental --verify
 ```
 
 `--verify` hands each finding, with the source around it, to Claude Code run without a terminal
-(`claude --print`, read-only tools, Sonnet unless `--verify-model` names another model), and reports only the
+(`claude --print`, read-only tools, Sonnet; `--verify-model haiku` on its own does the same with Haiku), and reports only the
 findings that reader calls true and worth raising, each with its reason. Claude Code must be installed and
 signed in. A finding the reader could not answer is still reported, and counted as not verified.
 
 On two corpora with blind panel labels, Jev alone was right on 56 of 159 findings (35%); `--verify` kept 53,
-of which 45 were right (85%), and kept 45 of the 56 right ones. One instruction was added after a first
-run on the same corpora, so that is not a number from unseen data.
+of which 45 were right (85%), and kept 45 of the 56 right ones. `--verify-model haiku` scored the same
+on two runs (82 and 86% right) at about a twentieth of the cost. One instruction was added after a first
+run on the same corpora, so these are not numbers from unseen data.
 [docs/verify-findings.md](docs/verify-findings.md) has how it works, the cautions, and how to hand the
 findings to your own coding agent instead.
 

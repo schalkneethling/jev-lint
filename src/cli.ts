@@ -85,7 +85,7 @@ if ((positionals.length === 0 && !values.axe) || !ISOLATIONS.includes(values.iso
       "  --experimental       also run the opt-in rules: those a blind panel called right less than half the time",
       "  --min-probability <p>  also report, for review, everything at this probability or above: a longer list for a second reader to confirm",
       "  --verify             have a second reader open each reported file and keep only the findings it confirms; runs Claude Code (`claude`), which must be installed and signed in",
-      "  --verify-model <name>  the second reader's model: sonnet (default) keeps fewer findings and is right more often, haiku keeps more",
+      "  --verify-model <name>  the same, with the reader you name: sonnet (what --verify uses) or haiku, which scored as well for far less",
       "  --config <file>      config file; by default jev-lint.config.ts (or .mts, .mjs, .js) in the first directory given",
       "  --no-cache           ask Jev again even for unchanged input",
       "  --cache-only         never call Jev; classify only what the cache can answer (needs no API key)",
@@ -99,6 +99,11 @@ if ((positionals.length === 0 && !values.axe) || !ISOLATIONS.includes(values.iso
 const partial = (["changed", "since", "rule", "cache-only"] as const).filter((flag) => values[flag] !== undefined && values[flag] !== false);
 if (values["write-baseline"] && partial.length > 0) {
   console.error(`--write-baseline records every finding of a full run, so it cannot be combined with --${partial.join(", --")}.`);
+  process.exit(2);
+}
+
+if (values["no-cache"] && values["cache-only"]) {
+  console.error("--no-cache never reads the cache and --cache-only reads nothing else, so together they classify almost nothing.");
   process.exit(2);
 }
 
@@ -191,12 +196,9 @@ if (values["write-baseline"]) {
   process.exit(0);
 }
 
-if (values["verify-model"] !== undefined && !values.verify) {
-  console.error("--verify-model names the model for --verify, so it needs --verify.");
-  process.exit(2);
-}
 let verification: VerifyResult | undefined;
-if (values.verify && findings.length > 0) {
+// Naming the reader's model asks for the reader, so `--verify-model haiku` needs no `--verify` beside it.
+if ((values.verify || values["verify-model"] !== undefined) && findings.length > 0) {
   const model = values["verify-model"] ?? "sonnet";
   // The reader may read inside the linted project, and inside the directory of any file given from outside it.
   const cwd = resolve(projectDir);

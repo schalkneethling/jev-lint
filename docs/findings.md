@@ -1573,11 +1573,18 @@ panel had labelled:
 | --- | --- | --- | --- | --- |
 | None | 159 | 159 | 56 (35%) | 56 |
 | `--verify` (Sonnet) | 159 | 53 | 45 (85%) | 45 (80%) |
+| `--verify --verify-model haiku`, first run | 159 | 61 | 50 (82%) | 50 (89%) |
+| `--verify --verify-model haiku`, second run | 159 | 56 | 48 (86%) | 48 (86%) |
 
 | Corpus | Findings | Kept | Kept, labelled | Right | Right ones kept |
 | --- | --- | --- | --- | --- | --- |
 | Third | 109 | 38 | 34 | 30 (88%) | 30 of 40 |
 | Fourth | 71 | 19 | 19 | 15 (79%) | 15 of 16 |
+
+Haiku was run twice through the same flag. It was right as often as Sonnet (82 and 86% against 85%), kept
+more of the right findings (89 and 86% against 80%), and cost $0.05 to $0.13 for both corpora against about
+$2. In §32 a Haiku agent handed the report by hand was right on 71%, so the source in the prompt appears to
+matter more for the smaller model. Sonnet stays the default until this holds on a corpus neither has seen.
 
 Before the duplicate instruction the same runs gave 22 of 27 and 10 of 15, so the instruction was fitted to
 these corpora and the 85% is not from unseen data. It is also one run of each: the fourth corpus kept 15 on
