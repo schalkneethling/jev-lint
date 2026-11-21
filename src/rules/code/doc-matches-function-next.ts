@@ -43,6 +43,7 @@ const KINDS = {
 
 export default defineCodeRule({
   id: "doc-matches-function-next",
+  compares: [{ field: "body", label: "The function" }],
   description: "A function's documentation comment, its tags included, should be true of the function.",
   // Experimental. `doc-matches-function` sends only the summary, on the reasoning that tags are a type
   // checker's to verify. Reviewers reading real files disagreed: of the doc defects they found, many were in

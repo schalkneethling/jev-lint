@@ -4,6 +4,8 @@ import { clip } from "./shared.ts";
 
 export default defineCodeRule({
   id: "test-title-matches-body",
+  // The assertions are the part of a test that checks anything, so they are what a reader compares the title with.
+  compares: [{ field: "assertions", label: "It asserts" }, { field: "body", label: "The test" }],
   description: "A test should check what its title claims.",
   // Real tests often assert through helpers and mapped values, which takes reasoning to connect to the
   // title. Below 0.88 two blind panels called most reports wrong (smoke tests, thin assertions that still
@@ -21,7 +23,7 @@ export default defineCodeRule({
       // A test with no assertion is a smoke test: it claims only that the code runs. Whether that is enough
       // is a team's policy and a parser's job (jest/expect-expect), not a question about the title.
       .filter((test) => test.hasAssertion)
-      .map((test) => ({ loc: test.loc, data: { title: test.title, body: clip(test.body) } })),
+      .map((test) => ({ loc: test.loc, meta: { assertions: test.assertions.join("\n") }, data: { title: test.title, body: clip(test.body) } })),
 
   questions: (ref) => ({
     // No criteria: the boundary is plain, and removing them changed nothing (scripts/criteria-experiment.ts).

@@ -41,6 +41,7 @@ const RETURN_PROMISED = 0.7;
 
 export default defineCodeRule({
   id: "doc-matches-function",
+  compares: [{ field: "body", label: "The function" }],
   description: "A function's documentation comment should be true of the function.",
   // A product of two answers about real functions, which often do a little more than their summary says.
   // Few candidates and few reports, so this is the least measured default rule. Of 410 functions with a

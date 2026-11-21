@@ -1,6 +1,7 @@
 import { styleText } from "node:util";
 import type { Finding, RunStats, Severity } from "../engine/types.ts";
 import type { VerifyStats } from "../engine/verify.ts";
+import { excerpt } from "./excerpt.ts";
 import { byElement } from "./group.ts";
 
 const COLORS = { error: "red", warn: "yellow", review: "cyan" } as const satisfies Record<Severity, string>;
@@ -27,6 +28,11 @@ export function stylish(findings: Finding[], stats: RunStats, options: { evidenc
       for (const f of element.findings) {
         lines.push(`    ${styleText(COLORS[f.severity], f.severity.padEnd(6))} ${f.message}  ${dim(`${f.ruleId} p=${f.p.toFixed(2)}`)}`);
         if (f.hint) lines.push(`           ${f.hint}`);
+        if (f.compared) {
+          const code = excerpt(f.compared.code);
+          if (code.length === 1) lines.push(`           ${f.compared.label}: ${dim(code[0]!)}`);
+          else lines.push(`           ${f.compared.label}:`, ...code.map((line) => dim(`             ${line}`)));
+        }
         if (f.confirmed) lines.push(`           ${styleText("green", "confirmed")}  ${f.confirmed.reason}`);
         if (f.occurrences) {
           const places = f.occurrences.map(({ loc }) => `${loc.line}:${loc.col}`);

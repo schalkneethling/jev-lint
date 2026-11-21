@@ -44,6 +44,7 @@ const ANNOUNCES_A_WRITE = /(Or|And|Then)(Create|Insert|Add|Set|Save|Store|Write|
 
 export default defineCodeRule({
   id: "function-name-matches-body",
+  compares: [{ field: "body", label: "The function" }],
   description: "A function whose name promises only an answer should not have side effects.",
   // Calibrated on three blind panels. In the first two, every report called right sat at 0.78 or above, and
   // in the second the mean was 0.85 for right reports and 0.62 for wrong ones: a cursor's `read…` advancing

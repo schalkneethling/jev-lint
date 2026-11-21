@@ -97,6 +97,17 @@ pnpm lint path/to/project --baseline jev-lint-baseline.json   # only findings th
 
 Exit code 1 when any finding is an error.
 
+Jev answers with a probability and cannot say what the code does instead of what the words claim. So a
+finding about a function, a comment or a test shows the code the words were compared with, a few lines of
+it, under the message. `--verify` goes further: the second reader's reason names the code that decided it.
+
+```
+  9:8      function listItems
+    error  The documentation of "listItems" says something the function does not do: "Returns every item in the cart, including items that are out of stock."
+           The function: return cart.items.filter((item) => item.inStock);
+           confirmed  The doc says out-of-stock items are included, but `listItems` filters on `item.inStock`.
+```
+
 `path/to/project` need not be this repository. The config file and its ignore globs are read from the first
 directory given; changed lines are read from each directory given.
 

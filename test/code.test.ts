@@ -8,6 +8,7 @@ import { defineCodeRule } from "../src/engine/types.ts";
 import commentDescribesCode from "../src/rules/code/comment-describes-code.ts";
 import { commentKind } from "../src/rules/code/comment-kind.ts";
 import { commentCandidates } from "../src/rules/code/shared.ts";
+import { allRules } from "../src/rules/index.ts";
 
 const source = `
 export function getUser(id: string) {
@@ -149,4 +150,31 @@ test("a comment is paired with the paragraph of code under it, up to the next bl
     `// Calculate amount from line items\nlet total = 0;\nfor (const item of items) total += item.amount;\n\nconsole.log(total);\n// Report it\nsend(total);\n// then stop\nstop();\n`,
   );
   assert.deepEqual(doc.comments.map((c) => c.code), ["let total = 0;\nfor (const item of items) total += item.amount;", "send(total);", "stop();"]);
+});
+
+test("a test-title finding shows the test's assertions, and a doc finding the function's body", async () => {
+  const source = [
+    "/** Returns every item. */",
+    "export function listItems(cart) {",
+    "  return cart.items.filter((item) => item.inStock);",
+    "}",
+    'it("sorts items by price", () => {',
+    "  const cart = build();",
+    "  assert.equal(cart.items.length, 2);",
+    "});",
+  ].join("\n");
+  const rules = allRules.filter((rule) => ["doc-matches-function", "test-title-matches-body"].includes(rule.id));
+  const ask: Ask = async (_state, questions) => ({
+    answers: Object.fromEntries(Object.keys(questions).map((name) => [name, { type: "noul", noul: /accurate|the title claims/.test(JSON.stringify(questions[name])) ? 0 : 1 }])) as never,
+    usage: { input_tokens: 0 } as never,
+  });
+  const { findings } = await run([{ path: "cart.test.ts", source }], { rules, ask, isolation: "candidate" });
+
+  assert.deepEqual(
+    findings.map((f) => [f.ruleId, f.compared?.label, f.compared?.code]),
+    [
+      ["doc-matches-function", "The function", "{\n  return cart.items.filter((item) => item.inStock);\n}"],
+      ["test-title-matches-body", "It asserts", "assert.equal(cart.items.length, 2)"],
+    ],
+  );
 });

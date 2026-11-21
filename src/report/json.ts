@@ -16,12 +16,13 @@ export function json(findings: Finding[], stats: RunStats, verification?: { stat
     line: loc.line,
     column: loc.col,
     snippet,
-    findings: group.map(({ ruleId, severity, p, message, hint, confirmed, checked, measurements, facts, axe, occurrences }) => ({
+    findings: group.map(({ ruleId, severity, p, message, hint, compared, confirmed, checked, measurements, facts, axe, occurrences }) => ({
       rule: ruleId,
       severity,
       probability: Number(p.toFixed(3)),
       message,
       hint,
+      compared,
       confirmed,
       checked,
       measurements,

@@ -6,6 +6,7 @@ import { test } from "node:test";
 import { JsonStore } from "../src/engine/cache.ts";
 import type { Finding } from "../src/engine/types.ts";
 import { verify, type Reader } from "../src/engine/verify.ts";
+import { excerpt } from "../src/report/excerpt.ts";
 import { json } from "../src/report/json.ts";
 import { stylish } from "../src/report/stylish.ts";
 
@@ -145,4 +146,21 @@ test("the reports say what the second reader confirmed and what it rejected", as
   assert.match(text, /confirmed.*The body returns null\./);
   assert.match(text, /second reader \(sonnet\): 1 confirmed, 1 rejected and left out/);
   assert.doesNotMatch(text, /claim on line 2/);
+});
+
+test("an excerpt drops the lines that only open and close a body, the shared indentation, and all but a few lines", () => {
+  assert.deepEqual(excerpt("{\n  return cart.items.filter((item) => item.inStock);\n}"), ["return cart.items.filter((item) => item.inStock);"]);
+  assert.deepEqual(excerpt("() => {\n    if (a) {\n      b();\n    }\n  })"), ["if (a) {", "  b();", "}"]);
+  // A section cut out of a file starts mid-line, so only its later lines still have their indentation.
+  assert.deepEqual(excerpt("cart.items.push(item);\n  cart.items.sort(byPrice);"), ["cart.items.push(item);", "cart.items.sort(byPrice);"]);
+  assert.deepEqual(excerpt("a;\nb;\nc;\nd;", 2), ["a;", "b;", "… 2 more lines"]);
+  assert.deepEqual(excerpt("x = { a: 1 }"), ["x = { a: 1 }"]);
+});
+
+test("a finding shows the code its words were compared with, under the message", () => {
+  const withCode: Finding = { ...finding("src/a.ts", 1), compared: { label: "The function", code: "{\n  return null;\n}" } };
+  const runStats = { requests: 0, questions: 0, cacheHits: 0, inputTokens: 0, unanswered: 0, suppressed: 0, unchanged: 0, baselined: 0 };
+
+  assert.match(stylish([withCode], runStats, { evidence: false }), /The function: .*return null;/);
+  assert.deepEqual(JSON.parse(json([withCode], runStats)).elements[0].findings[0].compared, withCode.compared);
 });

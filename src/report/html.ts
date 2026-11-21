@@ -1,4 +1,5 @@
 import type { Finding, RunStats, Severity } from "../engine/types.ts";
+import { excerpt } from "./excerpt.ts";
 import { byElement } from "./group.ts";
 
 const USD_PER_MILLION_TOKENS = 0.042;
@@ -37,6 +38,7 @@ function finding(f: Finding): string {
   </div>
   <p class="message">${esc(f.message)}</p>
   ${f.hint ? `<p class="hint">${esc(f.hint)}</p>` : ""}
+  ${f.compared ? `<p class="compared">${esc(f.compared.label)}:</p><pre class="compared"><code>${esc(excerpt(f.compared.code).join("\n"))}</code></pre>` : ""}
   ${f.confirmed ? `<p class="confirmed">Confirmed by a second reader (${esc(f.confirmed.by)}): ${esc(f.confirmed.reason)}</p>` : ""}
   ${f.occurrences ? `<p class="places">At lines ${f.occurrences.map(({ loc }) => loc.line).join(", ")}</p>` : ""}
   ${evidence(f)}
@@ -114,6 +116,7 @@ ul.findings { list-style: none; margin: 0; padding: 0 0 0 16px; border-inline-st
 .message { max-inline-size: 70ch; }
 .hint { color: var(--jev); max-inline-size: 70ch; }
 .confirmed { max-inline-size: 70ch; }
+.compared { margin-block: 0.25rem; overflow-x: auto; }
 .places { color: var(--muted); max-inline-size: 70ch; font-variant-numeric: tabular-nums; }
 .evidence { margin: 4px 0 0; display: grid; gap: 2px; font: 400 0.78rem/1.5 var(--mono); color: var(--muted); }
 .evidence div { display: grid; grid-template-columns: minmax(0, 17rem) 1fr; gap: 12px; }

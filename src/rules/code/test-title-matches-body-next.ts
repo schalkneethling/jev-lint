@@ -4,6 +4,8 @@ import { clip } from "./shared.ts";
 
 export default defineCodeRule({
   id: "test-title-matches-body-next",
+  // The assertions are the part of a test that checks anything, so they are what a reader compares the title with.
+  compares: [{ field: "assertions", label: "It asserts" }, { field: "body", label: "The test" }],
   description: "A test should check what its title claims (asks for the defect, and reads the enclosing suites).",
   // Experimental. A rewrite of `test-title-matches-body` that sends the `describe` titles, gates on whether
   // the title names an outcome at all, and asks whether the assertions check something else. It answers what
@@ -25,6 +27,7 @@ export default defineCodeRule({
       .filter((test) => !test.assertionsAllConstant)
       .map((test) => ({
         loc: test.loc,
+        meta: { assertions: test.assertions.join("\n") },
         // A title inside `describe` blocks is often half a sentence: "should be false by default" under
         // "silent". The suites are sent only when there are any, so a test without them costs nothing more.
         data: { ...(test.suites.length > 0 && { suite: test.suites.join(" > ") }), title: test.title, body: clip(test.body) },

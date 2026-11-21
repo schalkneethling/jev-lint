@@ -5,6 +5,7 @@ import { commentCandidates, makesAClaim } from "./shared.ts";
 
 export default defineCodeRule({
   id: "comment-describes-code",
+  compares: [{ field: "code", label: "The code below it" }],
   description: "A comment should be true of the code it heads.",
   // Experimental. Two blind panels called 2 of 26 of the earlier version's reports right, and its
   // probabilities did not rank them. This version changes what is sent (the section the comment heads, not

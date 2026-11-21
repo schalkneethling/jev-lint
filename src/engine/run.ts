@@ -97,7 +97,17 @@ function measurementOf(answer: ResultFor<Question>): Finding["measurements"][str
   return { choice: answer.choice, probability: answer.probabilities[answer.choice]! };
 }
 
-function toFinding(j: Classification, severity: Finding["severity"], { source, axe }: SourceFile): Finding {
+/** The first of the rule's `compares` fields that holds text for this candidate. */
+function comparedOf(rule: AnyRule | undefined, candidate: Candidate): Finding["compared"] {
+  for (const { field, label } of rule?.compares ?? []) {
+    const code = candidate.meta?.[field] ?? candidate.data[field];
+    if (typeof code === "string" && code.trim() !== "") return { label, code };
+  }
+  return undefined;
+}
+
+function toFinding(j: Classification, severity: Finding["severity"], { source, axe }: SourceFile, rule?: AnyRule): Finding {
+  const compared = comparedOf(rule, j.candidate);
   const { span } = j.candidate.loc;
   const quoted = span && source.slice(span.start, span.end).replace(/ data-jev-(axe|not-visible)="[^"]*"/g, "").replace(/\s+/g, " ");
   const onElement = axe && (j.candidate.loc.axe ?? []).map((index) => axe[index]!);
@@ -111,6 +121,7 @@ function toFinding(j: Classification, severity: Finding["severity"], { source, a
     ...(j.hint !== undefined && { hint: j.hint }),
     ...(j.pattern !== undefined && { pattern: j.pattern }),
     ...(quoted && { snippet: quoted.length > SNIPPET_LIMIT ? `${quoted.slice(0, SNIPPET_LIMIT)}…` : quoted }),
+    ...(compared && { compared }),
     checked: j.candidate.data,
     measurements: Object.fromEntries(Object.entries(j.answers).map(([name, answer]) => [name, measurementOf(answer)])),
     facts: { ...j.candidate.meta, ...(j.candidate.loc.widget && { "third-party widget": j.candidate.loc.widget }) },
@@ -274,7 +285,7 @@ export async function run(files: SourceFile[], options: RunOptions): Promise<Run
   });
   const fresh = baseline ? reported.filter((j) => !baseline.known.has(fingerprintOf(j, baseline.root))) : reported;
   stats.baselined = reported.length - fresh.length;
-  const findings: Finding[] = mergePatterns(fresh.map((j) => toFinding(j, j.severity!, sources.get(j.file)!)))
+  const findings: Finding[] = mergePatterns(fresh.map((j) => toFinding(j, j.severity!, sources.get(j.file)!, rules.find((rule) => rule.id === j.ruleId))))
     .sort((a, b) => a.file.localeCompare(b.file) || a.loc.line - b.loc.line || a.loc.col - b.loc.col);
 
   return { classifications, reported, findings, stats };

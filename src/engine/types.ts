@@ -83,6 +83,12 @@ export interface Rule<Q extends RuleQuestions = RuleQuestions, D = HtmlDoc> {
    * says how to weigh them. Without conventions the candidate, and so its cached answer, is unchanged.
    */
   readsConventions?: boolean;
+  /**
+   * The code a finding's words were compared with, so that a report can show it beside them: Jev answers
+   * with a probability and cannot say what the code does instead. Each entry names a field of the
+   * candidate (its `meta` first, then its `data`) and how to introduce it; the first that holds text is shown.
+   */
+  compares?: { field: string; label: string }[];
   /** Deterministic extraction. Anything a parser can decide is decided here. */
   select(doc: D): Candidate[];
   /**
@@ -169,6 +175,8 @@ export interface Finding extends Assessment {
   axe?: { rule: string; outcome: "passed" | "failed"; help: string; checksSameThing: boolean }[];
   /** Every element a repeated pattern was found on, the first included. Set only on a merged finding. */
   occurrences?: { loc: Loc; snippet?: string; checked: Candidate["data"] }[];
+  /** The code the words were compared with, as the rule's `compares` names it. */
+  compared?: { label: string; code: string };
   /** Set by `--verify` on a finding the second reader kept. */
   confirmed?: Confirmation;
 }
